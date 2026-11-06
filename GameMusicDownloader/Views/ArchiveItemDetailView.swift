@@ -57,7 +57,9 @@ struct ArchiveItemDetailView: View {
             Text(candidate.displayTitle).font(.headline)
             Text(readableSize(candidate.file.sizeInBytes)).font(.caption).foregroundStyle(.secondary)
             Text(candidate.licenseAssessment.name).font(.subheadline)
-            Text(candidate.licenseAssessment.message).font(.caption).foregroundStyle(candidate.licenseAssessment.canOfferDownload ? .secondary : .orange)
+            Text(candidate.licenseAssessment.message)
+    .font(.caption)
+    .foregroundStyle(candidate.licenseAssessment.canOfferDownload ? Color.secondary : Color.orange)
             HStack {
                 if let url = candidate.licenseAssessment.licenseURL { Link("Abrir licença", destination: url) }
                 if let url = candidate.archivePageURL { Link("Página do item", destination: url) }
