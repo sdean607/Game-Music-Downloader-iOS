@@ -122,12 +122,12 @@
 		); runOnlyForDeploymentPostprocessing = 0; };
 		00000000000000000000003A /* Frameworks */ = { isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		00000000000000000000003B /* Resources */ = { isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		000000000000000005 /* GameMusicDownloader */ = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000003C; buildPhases = (000000000000000027, 00000000000000003A, 00000000000000003B,); buildRules = (); dependencies = (); name = GameMusicDownloader; productName = GameMusicDownloader; productReference = 000000000000000026; productType = "com.apple.product-type.application"; };
-		000000000000000002 /* Project Configuration List */ = { isa = XCConfigurationList; buildConfigurations = (00000000000000003D, 00000000000000003E,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		00000000000000003C /* Target Configuration List */ = { isa = XCConfigurationList; buildConfigurations = (00000000000000003F, 000000000000000040,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		00000000000000003D /* Debug Project */ = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; }; name = Debug; };
-		00000000000000003E /* Release Project */ = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; }; name = Release; };
-		00000000000000003F /* Debug Target */ = { isa = XCBuildConfiguration; buildSettings = {
+		000000000000000000000005 /* GameMusicDownloader */ = { isa = PBXNativeTarget; buildConfigurationList = 00000000000000000000003C; buildPhases = (000000000000000000000027, 00000000000000000000003A, 00000000000000000000003B,); buildRules = (); dependencies = (); name = GameMusicDownloader; productName = GameMusicDownloader; productReference = 000000000000000000000026; productType = "com.apple.product-type.application"; };
+		000000000000000000000002 /* Project Configuration List */ = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000003D, 00000000000000000000003E,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		00000000000000000000003C /* Target Configuration List */ = { isa = XCConfigurationList; buildConfigurations = (00000000000000000000003F, 000000000000000000000040,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		00000000000000000000003D /* Debug Project */ = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; }; name = Debug; };
+		00000000000000000000003E /* Release Project */ = { isa = XCBuildConfiguration; buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; }; name = Release; };
+		00000000000000000000003F /* Debug Target */ = { isa = XCBuildConfiguration; buildSettings = {
 			CODE_SIGN_STYLE = Automatic;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = GameMusicDownloader/Info.plist;
@@ -139,7 +139,7 @@
 			IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 		}; name = Debug; };
-		000000000000000040 /* Release Target */ = { isa = XCBuildConfiguration; buildSettings = {
+		000000000000000000000040 /* Release Target */ = { isa = XCBuildConfiguration; buildSettings = {
 			CODE_SIGN_STYLE = Automatic;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = GameMusicDownloader/Info.plist;
