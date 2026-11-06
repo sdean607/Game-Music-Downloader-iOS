@@ -4,6 +4,25 @@
 	classes = {};
 	objectVersion = 56;
 	objects = {
+		000000000000000000000028 /* GameMusicDownloaderApp.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000014 /* GameMusicDownloaderApp.swift */; };
+		000000000000000000000029 /* MusicTrack.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000015 /* MusicTrack.swift */; };
+		00000000000000000000002A /* ArchiveService.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000016 /* ArchiveService.swift */; };
+		00000000000000000000002B /* LibraryStore.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000017 /* LibraryStore.swift */; };
+		00000000000000000000002C /* MusicPlayer.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000018 /* MusicPlayer.swift */; };
+		00000000000000000000002D /* PlaylistStore.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000019 /* PlaylistStore.swift */; };
+		00000000000000000000002E /* FavoritesStore.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001A /* FavoritesStore.swift */; };
+		00000000000000000000002F /* PlaybackHistoryStore.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001B /* PlaybackHistoryStore.swift */; };
+		000000000000000000000030 /* ContentView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001C /* ContentView.swift */; };
+		000000000000000000000031 /* SearchView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001D /* SearchView.swift */; };
+		000000000000000000000032 /* TrackRow.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001E /* TrackRow.swift */; };
+		000000000000000000000033 /* LibraryView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 00000000000000000000001F /* LibraryView.swift */; };
+		000000000000000000000034 /* PlaylistsView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000020 /* PlaylistsView.swift */; };
+		000000000000000000000035 /* FavoritesView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000021 /* FavoritesView.swift */; };
+		000000000000000000000036 /* HistoryView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000022 /* HistoryView.swift */; };
+		000000000000000000000037 /* EqualizerView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000023 /* EqualizerView.swift */; };
+		000000000000000000000038 /* SettingsView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000024 /* SettingsView.swift */; };
+		000000000000000000000039 /* EmptyStateView.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000025 /* EmptyStateView.swift */; };
+
 		000000000000000000000041 /* ArchiveModels.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000141 /* ArchiveModels.swift */; };
 		000000000000000000000042 /* LicenseChecker.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000142 /* LicenseChecker.swift */; };
 		000000000000000000000043 /* ArchiveCandidate.swift in Sources */ = { isa = PBXBuildFile; fileRef = 000000000000000000000143 /* ArchiveCandidate.swift */; };
