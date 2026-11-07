@@ -34,7 +34,7 @@ struct MiniPlayerView: View {
                     showingFullPlayer = true
                 } label: {
                     HStack(spacing: 10) {
-                        ArtworkPlaceholder(size: 42, game: track.game)
+                        GameArtworkView(size: 42, identifier: track.archiveIdentifier, game: track.game)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(track.title)
                                 .font(.subheadline.bold())
@@ -110,7 +110,7 @@ private struct FullPlayerView: View {
     private func playerContent(for track: MusicTrack) -> some View {
         VStack(spacing: 20) {
             Spacer(minLength: 8)
-            ArtworkPlaceholder(size: 260, game: track.game)
+            GameArtworkView(size: 260, identifier: track.archiveIdentifier, game: track.game)
                 .frame(maxWidth: .infinity)
             trackInformation(track)
             progressSection
@@ -290,37 +290,5 @@ private struct FullPlayerView: View {
         guard time.isFinite, time >= 0 else { return "0:00" }
         let seconds = Int(time)
         return String(format: "%d:%02d", seconds / 60, seconds % 60)
-    }
-}
-
-private struct ArtworkPlaceholder: View {
-    let size: CGFloat
-    let game: String
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.09, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [.purple.opacity(0.9), .indigo.opacity(0.75), .black],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                VStack(spacing: size * 0.06) {
-                    Image(systemName: "gamecontroller.fill")
-                        .font(.system(size: size * 0.32, weight: .light))
-                    Text(game.isEmpty ? "GAME MUSIC" : game.uppercased())
-                        .font(.system(size: max(9, size * 0.055), weight: .bold, design: .rounded))
-                        .tracking(1.5)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 12)
-                }
-                .foregroundStyle(.white.opacity(0.92))
-            }
-            .frame(width: size, height: size)
-            .shadow(color: .purple.opacity(0.25), radius: 24, y: 12)
-            .accessibilityLabel("Arte ilustrativa de \(game)")
     }
 }
