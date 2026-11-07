@@ -227,7 +227,7 @@ private struct FullPlayerView: View {
         } label: {
             Image(systemName: player.repeatMode == .one ? "repeat.1" : "repeat")
                 .font(.title3)
-                .foregroundStyle(player.repeatMode == .off ? .secondary : .purple)
+                .foregroundStyle(player.repeatMode == .off ? Color.secondary : Color.purple)
                 .frame(maxWidth: .infinity)
         }
         .accessibilityLabel("Modo de repetição")
