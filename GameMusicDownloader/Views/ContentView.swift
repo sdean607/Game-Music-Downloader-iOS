@@ -215,15 +215,19 @@ private struct FullPlayerView: View {
                         .ignoresSafeArea()
                     }
                 } else {
-                    ContentUnavailableView(
-                        "Nenhuma música em reprodução",
-                        systemImage: "music.note",
-                        description: Text("Escolha uma faixa na biblioteca para começar.")
-                    )
+                    VStack(spacing: 12) {
+                        Image(systemName: "music.note").font(.system(size: 44)).foregroundStyle(.purple)
+                        Text("Nenhuma música em reprodução").font(.headline)
+                        Text("Escolha uma faixa na biblioteca para começar.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.ignoresSafeArea())
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItem(placement: .navigationBarLeading) {
                     Button("Fechar") { dismiss() }
                         .foregroundStyle(.purple)
                 }
