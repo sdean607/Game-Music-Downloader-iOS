@@ -150,7 +150,7 @@
 			CODE_SIGN_STYLE = Automatic;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = GameMusicDownloader/Info.plist;
-			PRODUCT_BUNDLE_IDENTIFIER = com.example.GameMusicDownloader;
+			PRODUCT_BUNDLE_IDENTIFIER = com.tiagomartinez.gamemusic;
 			PRODUCT_NAME = "$(TARGET_NAME)";
 			TARGETED_DEVICE_FAMILY = "1,2";
 			SWIFT_EMIT_LOC_STRINGS = YES;
@@ -162,7 +162,7 @@
 			CODE_SIGN_STYLE = Automatic;
 			GENERATE_INFOPLIST_FILE = NO;
 			INFOPLIST_FILE = GameMusicDownloader/Info.plist;
-			PRODUCT_BUNDLE_IDENTIFIER = com.example.GameMusicDownloader;
+			PRODUCT_BUNDLE_IDENTIFIER = com.tiagomartinez.gamemusic;
 			PRODUCT_NAME = "$(TARGET_NAME)";
 			TARGETED_DEVICE_FAMILY = "1,2";
 			SWIFT_EMIT_LOC_STRINGS = YES;

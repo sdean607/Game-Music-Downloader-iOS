@@ -17,7 +17,7 @@ Este é um **pacote de desenvolvimento inicial**, não uma versão final validad
 1. Extraia o ZIP.
 2. Abra `GameMusicDownloader.xcodeproj`.
 3. Selecione o scheme `GameMusicDownloader`.
-4. Para assinar no seu dispositivo, substitua o Bundle Identifier de exemplo `com.example.GameMusicDownloader` por um identificador exclusivo e configure sua equipe Apple em Signing & Capabilities.
+4. Para assinar no seu dispositivo, o projeto usa provisoriamente `com.tiagomartinez.gamemusic`; confirme que esse identificador está disponível na sua conta Apple antes de assinar ou publicar e configure sua equipe Apple em Signing & Capabilities.
 5. Compile primeiro para um simulador iOS.
 
 ## Compilação automática no GitHub Actions
@@ -41,13 +41,13 @@ Quando o build termina com sucesso, o workflow publica o artefato `GameMusicDown
 
 ## Limitações e validações pendentes
 
-- A compilação Xcode ainda não foi confirmada por um runner macOS.
+- A compilação de iOS Simulator é executada pelo GitHub Actions; ela não valida instalação em iPhone físico.
 - A validação automatizada da licença cobre a declaração dos metadados; não comprova titularidade, autorização do uploader ou que cada faixa individual esteja coberta pela licença do item.
 - O fluxo de download ainda não exibe percentual real de progresso.
 - A pesquisa e os downloads precisam de testes ponta a ponta com respostas reais e variadas do Internet Archive.
 - Reprodução em segundo plano, interrupções de áudio, controles remotos e equalizador precisam ser testados em iPhone físico.
-- O Bundle Identifier ainda é um placeholder.
+- O Bundle Identifier `com.tiagomartinez.gamemusic` é provisório e precisa ser confirmado na conta Apple antes da distribuição.
 
-## Observação sobre direitos autorais
+## Política de privacidade\n\nA política de privacidade está em `docs/index.html`. Depois de ativar o GitHub Pages usando a branch `main` e a pasta `/docs` em Settings → Pages, o endereço previsto será https://sdean607.github.io/Game-Music-Downloader-iOS/. A página ainda não está publicada até essa configuração ser ativada.\n\n## Observação sobre direitos autorais
 
 A presença de um arquivo no Internet Archive não significa, por si só, que ele esteja livre de direitos autorais. Antes de baixar, redistribuir ou utilizar qualquer áudio, confirme a licença, a titularidade e as permissões aplicáveis.
