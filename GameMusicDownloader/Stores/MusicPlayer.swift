@@ -40,6 +40,7 @@ final class MusicPlayer: ObservableObject {
     private var currentIndex = 0
     private var playbackGeneration = 0
     private var remoteCommandsConfigured = false
+    private var shouldResumeAfterInterruption = false
     private var progressTimer: Timer?
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
@@ -403,13 +404,16 @@ final class MusicPlayer: ObservableObject {
 
         switch type {
         case .began:
-            if isPlaying {
+            shouldResumeAfterInterruption = isPlaying
+            if shouldResumeAfterInterruption {
                 pause()
             }
         case .ended:
             let rawOptions = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: rawOptions)
-            if options.contains(.shouldResume) {
+            let shouldResume = shouldResumeAfterInterruption && options.contains(.shouldResume)
+            shouldResumeAfterInterruption = false
+            if shouldResume {
                 resume()
             }
         @unknown default:
