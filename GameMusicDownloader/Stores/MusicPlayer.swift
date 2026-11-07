@@ -133,11 +133,8 @@ final class MusicPlayer: ObservableObject {
 
     func next() {
         guard !queue.isEmpty else { return }
-        if repeatMode == .one {
-            restartCurrentTrack()
-            return
-        }
-
+        // O modo repetir uma faixa só se aplica ao término automático.
+        // Um comando explícito de Próxima deve sempre avançar na fila.
         let nextIndex: Int
         if isShuffleEnabled && queue.count > 1 {
             let choices = queue.indices.filter { $0 != currentIndex }
