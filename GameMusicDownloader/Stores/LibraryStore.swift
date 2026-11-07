@@ -19,6 +19,17 @@ final class LibraryStore: ObservableObject {
     init() { createDirectory(); load() }
     func contains(_ track: MusicTrack) -> Bool { tracks.contains { $0.id == track.id } && track.isDownloaded }
 
+    var totalStorageBytes: Int64 {
+        tracks.reduce(Int64.zero) { total, track in
+            guard let url = track.localURL,
+                  let values = try? url.resourceValues(forKeys: [.fileSizeKey]),
+                  let fileSize = values.fileSize else {
+                return total
+            }
+            return total + Int64(fileSize)
+        }
+    }
+
     func add(_ track: MusicTrack) throws {
         guard track.isDownloaded else { throw LibraryStoreError.missingAudioFile }
         guard !tracks.contains(where: { $0.archiveIdentifier == track.archiveIdentifier && $0.filename == track.filename }) else {
