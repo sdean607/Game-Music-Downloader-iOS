@@ -35,8 +35,28 @@ struct ArchiveItemDetailView: View {
             }
             if downloader.isDownloading {
                 Section("Download") {
-                    ProgressView("Baixando para o iPhone...")
-                    Button("Cancelar download", role: .destructive) { downloader.cancel() }
+                    VStack(alignment: .leading, spacing: 10) {
+                        if let expected = downloader.expectedBytes, expected > 0 {
+                            ProgressView(value: downloader.progress)
+                        } else {
+                            ProgressView()
+                        }
+                        HStack {
+                            Text(downloader.statusMessage ?? "Baixando música...")
+                                .font(.subheadline)
+                            Spacer()
+                            if let expected = downloader.expectedBytes, expected > 0 {
+                                Text("\(Int(downloader.progress * 100))%")
+                                    .font(.subheadline.monospacedDigit())
+                            }
+                        }
+                        Text(downloadSizeDescription)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Cancelar download", role: .destructive) {
+                            downloader.cancel()
+                        }
+                    }
                 }
             }
             if let message = downloadMessage { Section("Resultado") { Text(message) } }
@@ -58,24 +78,38 @@ struct ArchiveItemDetailView: View {
             Text(readableSize(candidate.file.sizeInBytes)).font(.caption).foregroundStyle(.secondary)
             Text(candidate.licenseAssessment.name).font(.subheadline)
             Text(candidate.licenseAssessment.message)
-    .font(.caption)
-    .foregroundStyle(candidate.licenseAssessment.canOfferDownload ? Color.secondary : Color.orange)
+                .font(.caption)
+                .foregroundStyle(candidate.licenseAssessment.canOfferDownload ? Color.secondary : Color.orange)
             HStack {
                 if let url = candidate.licenseAssessment.licenseURL { Link("Abrir licença", destination: url) }
                 if let url = candidate.archivePageURL { Link("Página do item", destination: url) }
             }.font(.caption)
             if candidate.licenseAssessment.canOfferDownload {
-                Button("Verificar e baixar") { pendingCandidate = candidate; showingConfirmation = true }
-                    .buttonStyle(.borderedProminent).disabled(downloader.isDownloading)
+                Button("Verificar e baixar") {
+                    pendingCandidate = candidate
+                    showingConfirmation = true
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(downloader.isDownloading)
             } else {
                 Label("Download bloqueado", systemImage: "lock.fill").foregroundStyle(.orange)
             }
         }.padding(.vertical, 6)
     }
 
+    private var downloadSizeDescription: String {
+        let downloaded = ByteCountFormatter.string(fromByteCount: downloader.downloadedBytes, countStyle: .file)
+        if let expected = downloader.expectedBytes, expected > 0 {
+            let total = ByteCountFormatter.string(fromByteCount: expected, countStyle: .file)
+            return "\(downloaded) de \(total)"
+        }
+        return "\(downloaded) baixados"
+    }
+
     private func readableSize(_ bytes: Int64?) -> String {
         guard let bytes else { return "Tamanho não informado" }
-        let formatter = ByteCountFormatter(); formatter.countStyle = .file
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
 
@@ -85,7 +119,9 @@ struct ArchiveItemDetailView: View {
             do {
                 let track = try await downloader.download(candidate, library: library)
                 downloadMessage = "Salvo na biblioteca: \(track.title)"
-            } catch { downloadMessage = "Não foi possível baixar: \(error.localizedDescription)" }
+            } catch {
+                downloadMessage = "Não foi possível baixar: \(error.localizedDescription)"
+            }
             pendingCandidate = nil
         }
     }
