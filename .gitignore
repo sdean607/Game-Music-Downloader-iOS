@@ -3,3 +3,13 @@ DerivedData/
 build/
 *.xcuserstate
 xcuserdata/
+
+# Python web server
+__pycache__/
+*.py[cod]
+.venv/
+server/.venv/
+server/data/
+.env
+.env.*
+!.env.example

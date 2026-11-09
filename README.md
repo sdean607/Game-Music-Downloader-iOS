@@ -1,53 +1,78 @@
 # Game Music Downloader
 
-Aplicativo iOS nativo em SwiftUI para pesquisar músicas de jogos no Internet Archive, baixar arquivos MP3 e organizar uma biblioteca local.
+Plataforma web responsiva para pesquisar, baixar (quando autorizado), organizar e reproduzir músicas de jogos. O projeto iOS original permanece no repositório como referência enquanto a experiência web é desenvolvida.
 
-## Estado deste pacote
+## Plataforma web
 
-Este é um **pacote de desenvolvimento inicial**, não uma versão final validada. A estrutura do projeto Xcode e o workflow de CI estão incluídos, mas este pacote ainda precisa de uma compilação real em macOS/Xcode e de testes em dispositivo.
+A aplicação web usa:
+- **Frontend:** HTML, CSS e JavaScript, com tema escuro preto/roxo e layout adaptável a computador e celular.
+- **Backend:** Python 3.13, FastAPI e Uvicorn.
+- **Catálogo:** Internet Archive (pesquisa, metadados e arquivos).
+- **Biblioteca:** arquivos MP3 e índice JSON armazenados no computador que hospeda o servidor.
+- **PWA:** manifesto e service worker para permitir adicionar o site à tela inicial. O cache offline cobre a interface; a API, a biblioteca e o áudio continuam exigindo o servidor ligado e conexão.
+- **Acesso:** autenticação HTTP Basic obrigatória na API. Para acesso externo, use HTTPS por meio de um túnel; não abra portas no roteador.
 
-## Requisitos
+## Iniciar no Windows 10
 
-- Xcode compatível com iOS 16 ou superior.
-- macOS para compilar o aplicativo iOS.
-- Conta Apple e assinatura configuradas apenas para instalar/distribuir uma versão assinada em dispositivo; a compilação de Simulator do workflow não exige assinatura.
+Requisitos: Windows 10 64-bit, Python 3.13 e conexão com a internet.
 
-## Abrir no Xcode
+1. Baixe o ZIP da branch de desenvolvimento web ou clone o repositório.
+2. Abra a pasta `server`.
+3. Execute `setup.bat` para criar o ambiente virtual e instalar as dependências.
+4. Execute `start-server.bat`.
+5. Defina uma senha forte quando solicitada. A senha é obrigatória; não existe senha padrão.
+6. Abra `http://127.0.0.1:8000` no navegador.
+7. Entre com a senha definida no terminal.
 
-1. Extraia o ZIP.
-2. Abra `GameMusicDownloader.xcodeproj`.
-3. Selecione o scheme `GameMusicDownloader`.
-4. Para assinar no seu dispositivo, substitua o Bundle Identifier de exemplo `com.example.GameMusicDownloader` por um identificador exclusivo e configure sua equipe Apple em Signing & Capabilities.
-5. Compile primeiro para um simulador iOS.
+A biblioteca será criada em `server/data/music`, com índice em `server/data/library.json`. Não coloque essa pasta no Git nem a compartilhe publicamente.
 
-## Compilação automática no GitHub Actions
+## Acesso pela internet
 
-O arquivo `.github/workflows/ios-build.yml` executa um build de iOS Simulator em um runner `macos-15` quando há push ou pull request na branch `main`, ou quando o workflow é iniciado manualmente.
+O servidor escuta somente em `127.0.0.1:8000`. Para um teste remoto, instale o Cloudflare Tunnel e execute:
 
-Quando o build termina com sucesso, o workflow publica o artefato `GameMusicDownloader-iOS-Simulator` por 14 dias. Esse artefato é destinado ao Simulator; não é um IPA assinado para instalação em iPhone.
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8000
+```
 
-## Funcionalidades integradas nesta etapa
+O Quick Tunnel gera um endereço HTTPS temporário. Mantenha o terminal do túnel aberto. O endereço é público, portanto compartilhe-o somente com pessoas autorizadas e use uma senha forte. Quick Tunnels são destinados a testes, não a hospedagem permanente. Para uso contínuo, configure um túnel nomeado e domínio ou outra solução de acesso privado.
 
-- Pesquisa de itens de áudio no Internet Archive, incluindo a licença declarada na pesquisa.
-- Tela de detalhes que consulta os metadados completos antes de listar arquivos.
-- Filtro de arquivos: extensão `.mp3`, nome seguro, arquivo não privado e origem diferente de `metadata`.
-- Verificação conservadora da licença, comparando o valor da pesquisa com os metadados.
-- Downloads liberados somente para CC0, Public Domain Mark, CC BY e CC BY-SA nas versões reconhecidas pelo verificador.
-- Bloqueio de licenças ausentes, divergentes, desconhecidas, NC e ND.
-- Confirmação explícita do usuário antes de iniciar o download.
-- Download temporário com validação HTTP, tipo MIME, arquivo não vazio e limite de 150 MB.
-- Biblioteca local em `Documents/GameMusic`, indexada por `library.json`.
-- Player, playlists, favoritos, histórico e equalizador de 10 bandas continuam na estrutura do app.
+## Funcionalidades web incluídas nesta etapa
 
-## Limitações e validações pendentes
+- Pesquisa de itens de áudio no Internet Archive.
+- Consulta de metadados e listagem de arquivos MP3 públicos.
+- Verificação conservadora de licenças CC0, Public Domain Mark, CC BY e CC BY-SA.
+- Bloqueio de licenças ausentes, divergentes, NC, ND e desconhecidas.
+- Confirmação explícita de direitos antes do download.
+- Revalidação dos metadados no servidor antes de baixar.
+- Limite de 150 MB, validação de MIME, arquivo não vazio e nome seguro.
+- Biblioteca central no computador servidor.
+- Reprodução no navegador, controles de faixa, seek, volume, aleatório e repetição.
+- Favoritos, playlists e histórico armazenados no navegador.
+- Interface PWA responsiva.
 
-- A compilação Xcode ainda não foi confirmada por um runner macOS.
-- A validação automatizada da licença cobre a declaração dos metadados; não comprova titularidade, autorização do uploader ou que cada faixa individual esteja coberta pela licença do item.
-- O fluxo de download ainda não exibe percentual real de progresso.
-- A pesquisa e os downloads precisam de testes ponta a ponta com respostas reais e variadas do Internet Archive.
-- Reprodução em segundo plano, interrupções de áudio, controles remotos e equalizador precisam ser testados em iPhone físico.
-- O Bundle Identifier ainda é um placeholder.
+## Limitações conhecidas desta etapa
 
-## Observação sobre direitos autorais
+- Esta é a primeira base funcional da versão web; não substitui ainda todas as telas e recursos do aplicativo iOS.
+- Favoritos, playlists e histórico ficam no armazenamento local do navegador; a biblioteca de áudio fica no servidor.
+- A reprodução em segundo plano e os controles da tela bloqueada dependem do suporte do navegador e do sistema operacional.
+- O servidor doméstico precisa permanecer ligado e conectado para acesso remoto.
+- O Quick Tunnel tem URL temporária e não é uma solução de produção.
+- A declaração de licença do Internet Archive não comprova titularidade nem autorização do uploader. O usuário deve conferir a página do item e os direitos aplicáveis.
 
-A presença de um arquivo no Internet Archive não significa, por si só, que ele esteja livre de direitos autorais. Antes de baixar, redistribuir ou utilizar qualquer áudio, confirme a licença, a titularidade e as permissões aplicáveis.
+## Projeto iOS original
+
+O projeto SwiftUI permanece em `GameMusicDownloader.xcodeproj` enquanto a versão web é validada. O workflow `ios-build.yml` continua disponível para compilar o app no iOS Simulator; esse artefato não é um IPA assinado para instalação em iPhone.
+
+## Desenvolvimento e testes
+
+Na pasta `server`:
+
+```powershell
+py -3.13 -m venv .venv
+.\\.venv\\Scripts\\activate.bat
+python -m pip install -r requirements.txt
+python -m compileall -q .
+python -m unittest discover -s tests -v
+```
+
+A compilação de sintaxe e os testes automatizados não substituem testes reais de pesquisa, download e reprodução com dados do Internet Archive.

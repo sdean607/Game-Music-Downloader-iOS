@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09070f">
+  <meta name="description" content="Pesquise, organize e reproduza trilhas sonoras de jogos com licenças verificadas.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Game Music Downloader</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Game Music Downloader início">
+        <span class="brand-mark">♫</span>
+        <span><strong>GAME MUSIC</strong><small>DOWNLOADER</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Navegação principal">
+        <button class="nav-button active" data-view="search"><span>⌕</span> Explorar</button>
+        <button class="nav-button" data-view="library"><span>▤</span> Minha biblioteca</button>
+        <button class="nav-button" data-view="favorites"><span>♡</span> Favoritos</button>
+        <button class="nav-button" data-view="playlists"><span>≡</span> Playlists</button>
+        <button class="nav-button" data-view="history"><span>◷</span> Histórico</button>
+      </nav>
+      <div class="sidebar-note"><span class="status-dot"></span> Servidor pessoal</div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div><span class="eyebrow">SUA TRILHA SONORA</span><h1 id="page-title">Explore músicas de jogos</h1></div>
+        <button id="logout-button" class="ghost-button" type="button" hidden>Sair</button>
+      </header>
+
+      <section id="search-view" class="view active">
+        <div class="hero">
+          <div class="hero-copy">
+            <span class="pill">INTERNET ARCHIVE</span>
+            <h2>Reviva os mundos<br><em>através da música.</em></h2>
+            <p>Pesquise trilhas, consulte os arquivos e confira as licenças antes de baixar.</p>
+            <form id="search-form" class="search-form">
+              <span aria-hidden="true">⌕</span>
+              <input id="search-input" type="search" maxlength="160" placeholder="Nome do jogo, trilha ou artista..." autocomplete="off" required>
+              <button class="primary-button" type="submit">Pesquisar</button>
+            </form>
+          </div>
+          <div class="hero-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="disc">♫</div><div class="equalizer"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+        </div>
+        <div class="section-heading"><div><span class="eyebrow">RESULTADOS</span><h2 id="results-title">Comece sua pesquisa</h2></div><span id="results-count" class="muted"></span></div>
+        <div id="search-results" class="results-grid empty-panel"><div class="empty-icon">⌕</div><h3>O que você quer ouvir?</h3><p>Pesquise por título de jogo, compositor ou trilha sonora.</p></div>
+      </section>
+
+      <section id="library-view" class="view">
+        <div class="section-heading"><div><span class="eyebrow">OFFLINE NO SERVIDOR</span><h2>Minha biblioteca</h2></div><span id="library-count" class="muted"></span></div>
+        <div id="library-list" class="track-list"></div>
+      </section>
+
+      <section id="favorites-view" class="view">
+        <div class="section-heading"><div><span class="eyebrow">SELEÇÃO PESSOAL</span><h2>Favoritos</h2></div></div>
+        <div id="favorites-list" class="track-list"></div>
+      </section>
+
+      <section id="playlists-view" class="view">
+        <div class="section-heading"><div><span class="eyebrow">ORGANIZE SUA MÚSICA</span><h2>Playlists</h2></div></div>
+        <form id="playlist-form" class="playlist-form"><input id="playlist-name" maxlength="60" placeholder="Nome da nova playlist" required><button class="primary-button" type="submit">Criar playlist</button></form>
+        <div id="playlists-list" class="playlist-grid"></div>
+      </section>
+
+      <section id="history-view" class="view">
+        <div class="section-heading"><div><span class="eyebrow">OUVIDAS RECENTEMENTE</span><h2>Histórico</h2></div><button id="clear-history" class="ghost-button" type="button">Limpar</button></div>
+        <div id="history-list" class="track-list"></div>
+      </section>
+
+      <section id="detail-panel" class="detail-panel" hidden></section>
+    </main>
+  </div>
+
+  <footer id="player-bar" class="player-bar" hidden>
+    <div class="now-playing"><div class="cover-small">♫</div><div><strong id="player-title">Nenhuma faixa</strong><small id="player-artist">Escolha uma música da biblioteca</small></div></div>
+    <div class="player-controls"><div class="transport"><button id="previous-button" aria-label="Anterior">|◀</button><button id="play-button" class="play-button" aria-label="Reproduzir ou pausar">▶</button><button id="next-button" aria-label="Próxima">▶|</button></div><div class="timeline"><span id="current-time">0:00</span><input id="seek" type="range" min="0" max="100" value="0"><span id="duration">0:00</span></div></div>
+    <div class="player-options"><button id="shuffle-button" aria-label="Aleatório">⤨</button><button id="repeat-button" aria-label="Repetir">↻</button><span id="volume-icon">◖</span><input id="volume" type="range" min="0" max="1" step="0.01" value="0.85"></div>
+    <audio id="audio" preload="metadata"></audio>
+  </footer>
+
+  <div id="login-overlay" class="overlay">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark large">♫</div><span class="eyebrow">ACESSO PRIVADO</span><h2>Bem-vindo de volta</h2><p>Digite a senha configurada no servidor para acessar sua biblioteca.</p>
+      <input id="password-input" type="password" autocomplete="current-password" placeholder="Senha do servidor" required>
+      <p id="login-error" class="error-text" role="alert"></p>
+      <button class="primary-button full-width" type="submit">Entrar</button>
+    </form>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+  <script>if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));</script>
+</body>
+</html>

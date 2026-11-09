@@ -1,0 +1,44 @@
+import unittest
+
+from app import license_assessment, valid_mp3_filename, valid_identifier
+
+
+class LicenseAssessmentTests(unittest.TestCase):
+    def test_cc0_is_allowed(self):
+        result = license_assessment(
+            "https://creativecommons.org/publicdomain/zero/1.0/",
+            "https://creativecommons.org/publicdomain/zero/1.0/",
+        )
+        self.assertTrue(result["canOfferDownload"])
+        self.assertEqual(result["name"], "CC0 1.0")
+
+    def test_by_requires_attribution(self):
+        url = "https://creativecommons.org/licenses/by/4.0/"
+        result = license_assessment(url, url)
+        self.assertTrue(result["canOfferDownload"])
+        self.assertTrue(result["attributionRequired"])
+
+    def test_nc_is_blocked(self):
+        url = "https://creativecommons.org/licenses/by-nc/4.0/"
+        result = license_assessment(url, url)
+        self.assertFalse(result["canOfferDownload"])
+
+    def test_mismatch_is_blocked(self):
+        result = license_assessment(
+            "https://creativecommons.org/licenses/by/4.0/",
+            "https://creativecommons.org/licenses/by-sa/4.0/",
+        )
+        self.assertFalse(result["canOfferDownload"])
+        self.assertEqual(result["name"], "Licenças divergentes")
+
+    def test_bad_filename_and_identifier_are_rejected(self):
+        self.assertTrue(valid_mp3_filename("track.mp3"))
+        self.assertFalse(valid_mp3_filename("../track.mp3"))
+        self.assertFalse(valid_mp3_filename("track.wav"))
+        self.assertTrue(valid_identifier("archive-item_01"))
+        self.assertFalse(valid_identifier("../private"))
+        self.assertFalse(valid_identifier(".."))
+
+
+if __name__ == "__main__":
+    unittest.main()
