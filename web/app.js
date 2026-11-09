@@ -292,7 +292,8 @@ audio.addEventListener("pause", () => $("#play-button").textContent = "▶");
 audio.addEventListener("timeupdate", () => {
   $("#current-time").textContent = formatTime(audio.currentTime);
   $("#duration").textContent = formatTime(audio.duration);
-  $("#seek").value = audio.duration ? String(audio.currentTime / audio.duration * 100) : "0";\n  if ("mediaSession" in navigator && audio.duration) navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate, position: audio.currentTime });
+  $("#seek").value = audio.duration ? String(audio.currentTime / audio.duration * 100) : "0";
+  if ("mediaSession" in navigator && audio.duration && typeof navigator.mediaSession.setPositionState === "function") navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate, position: audio.currentTime });
 });
 audio.addEventListener("ended", () => {
   if (state.repeat === "one") { audio.currentTime = 0; audio.play(); return; }
