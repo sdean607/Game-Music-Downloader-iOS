@@ -129,7 +129,7 @@ class ChunkedPayloadTests(unittest.IsolatedAsyncioTestCase):
                 self.FakeContent([b"I", b"D", b"3", b"\\x04\\x00\\x00audio"]),
                 target,
             )
-            self.assertEqual(size, 10)
+            self.assertEqual(size, 11)
             self.assertEqual(target.read_bytes(), b"ID3\\x04\\x00\\x00audio")
 
     async def test_html_payload_is_rejected_and_removed(self):
