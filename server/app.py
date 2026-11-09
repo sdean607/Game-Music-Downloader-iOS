@@ -270,25 +270,28 @@ async def write_mp3_payload(content: Any, temporary: Path) -> int:
     """Grava o fluxo em disco, validando a assinatura e limpando em qualquer interrupção."""
     received = 0
     prefix = bytearray()
+    header_checked = False
     try:
         with temporary.open("wb") as output:
             async for chunk in content.iter_chunked(64 * 1024):
-                if len(prefix) < 3:
+                if not header_checked:
                     needed = 3 - len(prefix)
-                    prefix.extend(chunk[:needed])
-                    chunk = chunk[needed:]
-                    if len(prefix) >= 3:
+                    take = min(needed, len(chunk))
+                    prefix.extend(chunk[:take])
+                    chunk = chunk[take:]
+                    if len(prefix) == 3:
                         if not has_mp3_signature(bytes(prefix)):
                             raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
                         output.write(prefix)
                         received += len(prefix)
                         prefix.clear()
-                if chunk:
+                        header_checked = True
+                if header_checked and chunk:
                     received += len(chunk)
                     if received > MAX_DOWNLOAD_BYTES:
                         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
                     output.write(chunk)
-            if prefix:
+            if not header_checked and prefix:
                 if not has_mp3_signature(bytes(prefix)):
                     raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
                 output.write(prefix)
