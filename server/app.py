@@ -175,13 +175,18 @@ def build_archive_search_query(term: str) -> str:
     # Cada palavra pode aparecer em um campo diferente: por exemplo, o jogo
     # no assunto e o nome da trilha no título. Os tokens vêm de regex alfanumérica,
     # portanto não podem introduzir operadores Lucene.
-    tokens = list(dict.fromkeys(re.findall(r"[\w]+", term, flags=re.UNICODE)))
+    tokens = [
+        token for token in dict.fromkeys(re.findall(r"[\w]+", term, flags=re.UNICODE))
+        if token.upper() not in {"AND", "OR", "NOT"}
+    ]
     token_groups = [
         "(" + " OR ".join(f"{field}:{token}" for field in fields) + ")"
         for token in tokens
     ]
-    token_clause = " AND ".join(token_groups)
-    return f"mediatype:audio AND licenseurl:* AND ({phrase_clause} OR ({token_clause}))"
+    clauses = [phrase_clause]
+    if token_groups:
+        clauses.append("(" + " AND ".join(token_groups) + ")")
+    return f"mediatype:audio AND licenseurl:* AND ({' OR '.join(clauses)})"
 
 
 @app.get("/api/search")
