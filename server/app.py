@@ -247,7 +247,10 @@ async def download_track(body: DownloadRequest, _: str = Depends(require_auth)) 
         raise HTTPException(status_code=404, detail="Arquivo MP3 não encontrado nos metadados atuais.")
     if str(selected.get("private", "")).lower() in {"true", "1", "yes"} or clean_string(selected.get("source")) == "metadata":
         raise HTTPException(status_code=403, detail="O arquivo está privado ou não é um arquivo de áudio público.")
-    existing_tracks = await load_library()\n    if any(item.get("archiveIdentifier") == body.identifier and item.get("filename", "").endswith("_" + body.filename) for item in existing_tracks):\n        raise HTTPException(status_code=409, detail="Esta faixa já está na biblioteca.")\n    declared_size = clean_string(selected.get("size"))
+    existing_tracks = await load_library()
+    if any(item.get("archiveIdentifier") == body.identifier and item.get("filename", "").endswith("_" + body.filename) for item in existing_tracks):
+        raise HTTPException(status_code=409, detail="Esta faixa já está na biblioteca.")
+    declared_size = clean_string(selected.get("size"))
     if declared_size and declared_size.isdigit() and int(declared_size) > MAX_DOWNLOAD_BYTES:
         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
 
