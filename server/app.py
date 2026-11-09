@@ -59,7 +59,7 @@ def clean_string(value: Any) -> str | None:
 
 
 def valid_identifier(identifier: str) -> bool:
-    return bool(ARCHIVE_ID_PATTERN.fullmatch(identifier))
+    return identifier not in {'.', '..'} and bool(ARCHIVE_ID_PATTERN.fullmatch(identifier))
 
 
 def valid_mp3_filename(filename: str) -> bool:
@@ -80,16 +80,17 @@ def license_assessment(search_url: str | None, metadata_url: str | None) -> dict
         from urllib.parse import urlsplit
         try:
             parsed = urlsplit(raw.strip())
+            parsed_port = parsed.port
         except ValueError:
             return None
         if parsed.scheme.lower() not in {"http", "https"}:
             return None
         if (parsed.hostname or "").lower() not in {"creativecommons.org", "www.creativecommons.org"}:
             return None
-        if parsed.query or parsed.fragment or parsed.username or parsed.password or parsed.port:
+        if parsed.query or parsed.fragment or parsed.username or parsed.password or parsed_port is not None:
             return None
         path = parsed.path.strip("/").lower()
-        if not path:
+        if not path or path in {".", ".."}:
             return None
         return path, f"https://creativecommons.org/{path}/"
 
