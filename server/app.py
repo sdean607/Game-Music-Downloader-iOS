@@ -6,10 +6,12 @@ import json
 import os
 import re
 import uuid
+import ipaddress
+import socket
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urljoin, urlsplit
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException
@@ -159,6 +161,109 @@ class DownloadRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     search_license_url: str | None = None
     confirmed: bool = False
+
+
+class OpenverseDownloadRequest(BaseModel):
+    identifier: str = Field(min_length=36, max_length=36)
+    search_license_url: str = Field(min_length=1, max_length=500)
+    confirmed: bool = False
+
+
+def valid_openverse_id(identifier: str) -> bool:
+    try:
+        return str(uuid.UUID(identifier)) == identifier.lower()
+    except (ValueError, AttributeError):
+        return False
+
+
+async def openverse_json(url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
+    try:
+        async with httpx.AsyncClient(timeout=35, follow_redirects=False) as client:
+            response = await client.get(url, params=params, headers={"User-Agent": "GameMusicDownloader/1.0"})
+            response.raise_for_status()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ValueError("Resposta inesperada da API")
+            return payload
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 429:
+            raise HTTPException(status_code=503, detail="O Openverse limitou temporariamente as pesquisas. Tente novamente mais tarde.") from exc
+        raise HTTPException(status_code=502, detail="O Openverse não conseguiu responder à consulta.") from exc
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=502, detail="Falha ao consultar o Openverse.") from exc
+
+
+def openverse_license_url(item: dict[str, Any]) -> str | None:
+    direct = clean_string(item.get("license_url"))
+    if direct:
+        return direct
+    slug = clean_string(item.get("license"))
+    version = clean_string(item.get("license_version"))
+    if slug == "cc0":
+        return "https://creativecommons.org/publicdomain/zero/1.0/"
+    if slug == "pdm":
+        return "https://creativecommons.org/publicdomain/mark/1.0/"
+    if slug in {"by", "by-sa", "by-nc", "by-nc-sa", "by-nd", "by-nc-nd"} and version:
+        return f"https://creativecommons.org/licenses/{slug}/{version}/"
+    return None
+
+
+def openverse_mp3(item: dict[str, Any]) -> bool:
+    filetype = (clean_string(item.get("filetype")) or "").lower().lstrip(".")
+    url = clean_string(item.get("url")) or ""
+    return filetype == "mp3" or urlsplit(url).path.lower().endswith(".mp3")
+
+
+async def validate_public_media_url(raw_url: str) -> str:
+    try:
+        parsed = urlsplit(raw_url)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
+            raise ValueError("URL inválida")
+        if parsed.hostname.lower() in {"localhost", "localhost.localdomain"}:
+            raise ValueError("host local")
+        addresses = await asyncio.to_thread(socket.getaddrinfo, parsed.hostname, 443, type=socket.SOCK_STREAM)
+        if not addresses or any(not ipaddress.ip_address(entry[4][0]).is_global for entry in addresses):
+            raise ValueError("endereço não público")
+        return raw_url
+    except (ValueError, OSError, socket.gaierror) as exc:
+        raise HTTPException(status_code=400, detail="O endereço do arquivo não é um destino HTTPS público válido.") from exc
+
+
+async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
+    current_url = raw_url
+    received = 0
+    try:
+        async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
+            for _ in range(6):
+                await validate_public_media_url(current_url)
+                async with client.stream("GET", current_url, headers={"User-Agent": "GameMusicDownloader/1.0"}) as response:
+                    if response.is_redirect:
+                        location = response.headers.get("location")
+                        if not location:
+                            raise HTTPException(status_code=502, detail="Redirecionamento inválido do provedor de áudio.")
+                        current_url = urljoin(current_url, location)
+                        continue
+                    response.raise_for_status()
+                    mime = (response.headers.get("content-type") or "").split(";")[0].lower()
+                    accepted = {"audio/mpeg", "audio/mp3", "audio/x-mpeg", "audio/x-mp3", "application/octet-stream", "binary/octet-stream"}
+                    if mime and mime not in accepted:
+                        raise HTTPException(status_code=415, detail="O provedor não entregou um arquivo MP3 reconhecido.")
+                    with temporary.open("wb") as output:
+                        async for chunk in response.aiter_bytes(64 * 1024):
+                            received += len(chunk)
+                            if received > MAX_DOWNLOAD_BYTES:
+                                raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
+                            output.write(chunk)
+                    if received <= 0:
+                        raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
+                    return received
+            raise HTTPException(status_code=502, detail="O provedor excedeu o limite de redirecionamentos.")
+    except HTTPException:
+        temporary.unlink(missing_ok=True)
+        raise
+    except (httpx.HTTPError, OSError) as exc:
+        temporary.unlink(missing_ok=True)
+        raise HTTPException(status_code=502, detail="Falha ao baixar o áudio do provedor.") from exc
 
 
 @app.get("/api/health")
@@ -332,6 +437,76 @@ async def download_track(body: DownloadRequest, _: str = Depends(require_auth)) 
     tracks.insert(0, track)
     await save_library(tracks)
     return {"track": track, "message": "Música salva na biblioteca do servidor."}
+
+
+@app.get("/api/openverse/search")
+async def search_openverse(q: str, _: str = Depends(require_auth)) -> dict[str, Any]:
+    term = q.strip()
+    if not term or len(term) > 160:
+        raise HTTPException(status_code=400, detail="Digite um termo de pesquisa válido (até 160 caracteres).")
+    payload = await openverse_json("https://api.openverse.org/v1/audio/", {"q": term, "page_size": "20", "extension": "mp3", "filter_dead": "true", "mature": "false"})
+    results = []
+    for item in payload.get("results") or []:
+        identifier = clean_string(item.get("id"))
+        if not identifier or not valid_openverse_id(identifier) or not openverse_mp3(item):
+            continue
+        license_url = openverse_license_url(item)
+        assessment = license_assessment(license_url, license_url)
+        size = item.get("filesize")
+        if isinstance(size, (int, float)) and size > MAX_DOWNLOAD_BYTES:
+            continue
+        results.append({"identifier": identifier, "title": clean_string(item.get("title")) or "Áudio sem título", "creator": clean_string(item.get("creator")) or "Autor não informado", "licenseURL": license_url, "license": assessment, "landingURL": clean_string(item.get("foreign_landing_url")), "provider": clean_string(item.get("provider")), "filesize": size})
+    return {"results": results}
+
+
+@app.get("/api/openverse/items/{identifier}")
+async def openverse_item_details(identifier: str, search_license_url: str | None = None, _: str = Depends(require_auth)) -> dict[str, Any]:
+    if not valid_openverse_id(identifier):
+        raise HTTPException(status_code=400, detail="Identificador Openverse inválido.")
+    item = await openverse_json(f"https://api.openverse.org/v1/audio/{identifier}/")
+    current_license = openverse_license_url(item)
+    assessment = license_assessment(search_license_url, current_license)
+    size = item.get("filesize")
+    oversized = isinstance(size, (int, float)) and size > MAX_DOWNLOAD_BYTES
+    eligible = openverse_mp3(item) and not oversized and assessment["canOfferDownload"]
+    return {"identifier": identifier, "title": clean_string(item.get("title")) or "Áudio sem título", "creator": clean_string(item.get("creator")) or "Autor não informado", "licenseURL": current_license, "itemURL": clean_string(item.get("foreign_landing_url")), "provider": clean_string(item.get("provider")), "file": {"eligible": eligible, "size": size, "license": assessment, "reason": "Arquivo acima de 150 MB." if oversized else ("Somente arquivos MP3 são aceitos." if not openverse_mp3(item) else None)}}
+
+
+@app.post("/api/openverse/download")
+async def download_openverse_track(body: OpenverseDownloadRequest, _: str = Depends(require_auth)) -> dict[str, Any]:
+    if not body.confirmed:
+        raise HTTPException(status_code=400, detail="É necessária a confirmação dos direitos de uso.")
+    if not valid_openverse_id(body.identifier):
+        raise HTTPException(status_code=400, detail="Identificador Openverse inválido.")
+    item = await openverse_json(f"https://api.openverse.org/v1/audio/{body.identifier}/")
+    current_license = openverse_license_url(item)
+    assessment = license_assessment(body.search_license_url, current_license)
+    if not assessment["canOfferDownload"]:
+        raise HTTPException(status_code=403, detail=assessment["message"])
+    if not openverse_mp3(item):
+        raise HTTPException(status_code=415, detail="Somente arquivos MP3 são aceitos nesta versão.")
+    declared_size = item.get("filesize")
+    if isinstance(declared_size, (int, float)) and declared_size > MAX_DOWNLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
+    media_url = clean_string(item.get("url"))
+    landing_url = clean_string(item.get("foreign_landing_url"))
+    if not media_url or not landing_url:
+        raise HTTPException(status_code=422, detail="O Openverse não forneceu o endereço do áudio e sua página de origem.")
+    if any(track.get("sourceIdentifier") == body.identifier and track.get("source") == "openverse" for track in await load_library()):
+        raise HTTPException(status_code=409, detail="Esta faixa já está na biblioteca.")
+    MUSIC_DIR.mkdir(parents=True, exist_ok=True)
+    track_id = str(uuid.uuid4())
+    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", clean_string(item.get("title")) or "openverse-audio").strip("._")[:100] or "openverse-audio"
+    stored_name = f"{track_id}_{safe_title}.mp3"
+    destination = MUSIC_DIR / stored_name
+    temporary = MUSIC_DIR / f"{stored_name}.part"
+    received = await stream_openverse_media(media_url, temporary)
+    temporary.replace(destination)
+    track = {"id": track_id, "title": clean_string(item.get("title")) or safe_title, "artist": clean_string(item.get("creator")) or "Desconhecido", "game": clean_string(item.get("provider")) or "Openverse", "source": "openverse", "sourceIdentifier": body.identifier, "filename": stored_name, "license": assessment["licenseURL"], "attributionURL": landing_url, "creatorURL": clean_string(item.get("creator_url")), "provider": clean_string(item.get("provider")), "size": received, "downloadedAt": datetime.now(timezone.utc).isoformat()}
+    tracks = await load_library()
+    tracks.insert(0, track)
+    await save_library(tracks)
+    return {"track": track, "message": "Música do Openverse salva na biblioteca do servidor."}
 
 
 @app.get("/api/library")
