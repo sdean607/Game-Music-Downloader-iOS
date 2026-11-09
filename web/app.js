@@ -12,6 +12,7 @@ const state = {
   history: JSON.parse(localStorage.getItem("gmd-history") || "[]")
 };
 const audio = $("#audio");
+audio.volume = Number($("#volume").value);
 
 function authHeader() {
   return state.auth ? { Authorization: `Basic ${state.auth}` } : {};
