@@ -2,6 +2,7 @@ const $ = (selector) => document.querySelector(selector);
 const state = {
   auth: sessionStorage.getItem("gmd-auth") || "",
   tracks: [],
+  queue: [],
   currentIndex: -1,
   objectURL: null,
   shuffle: false,
@@ -191,7 +192,18 @@ function bindTrackActions(container, tracks) {
     renderLibrary();
     renderFavorites();
   }));
-  container.querySelectorAll(".playlist-track").forEach(button => button.addEventListener("click", () => {\n    if (!state.playlists.length) { toast("Crie uma playlist primeiro."); setView("playlists"); return; }\n    const choices = state.playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");\n    const answer = prompt(`Adicionar a qual playlist?\\n${choices}\\nDigite o número:`);\n    const index = Number(answer) - 1;\n    if (!Number.isInteger(index) || !state.playlists[index]) return;\n    const list = state.playlists[index];\n    if (!list.ids.includes(button.dataset.id)) list.ids.push(button.dataset.id);\n    savePlaylists(); toast(`Adicionada à playlist ${list.name}.`);\n  }));\n  container.querySelectorAll(".delete-track").forEach(button => button.addEventListener("click", async () => {
+  container.querySelectorAll(".playlist-track").forEach(button => button.addEventListener("click", () => {
+    if (!state.playlists.length) { toast("Crie uma playlist primeiro."); setView("playlists"); return; }
+    const choices = state.playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");
+    const answer = prompt(`Adicionar a qual playlist?\\n${choices}\\nDigite o número:`);
+    const index = Number(answer) - 1;
+    if (!Number.isInteger(index) || !state.playlists[index]) return;
+    const list = state.playlists[index];
+    if (!list.ids.includes(button.dataset.id)) list.ids.push(button.dataset.id);
+    savePlaylists();
+    toast(`Adicionada à playlist ${list.name}.`);
+  }));
+  container.querySelectorAll(".delete-track").forEach(button => button.addEventListener("click", async () => {
     if (!confirm("Excluir esta música do servidor?")) return;
     try { await api(`/api/library/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" }); await refreshLibrary(); toast("Música removida."); }
     catch (error) { toast(error.message); }
@@ -251,10 +263,18 @@ async function playTrack(track, queue = state.tracks) {
     state.objectURL = URL.createObjectURL(blob);
     audio.src = state.objectURL;
     state.currentIndex = queue.findIndex(item => item.id === track.id);
-    state.tracks = queue;
+    state.queue = queue;
     $("#player-title").textContent = track.title;
     $("#player-artist").textContent = track.artist;
     $("#player-bar").hidden = false;
+    if ("mediaSession" in navigator && "MediaMetadata" in window) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.artist, album: track.game, artwork: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }] });
+      navigator.mediaSession.setActionHandler("play", () => audio.play());
+      navigator.mediaSession.setActionHandler("pause", () => audio.pause());
+      navigator.mediaSession.setActionHandler("previoustrack", previousTrack);
+      navigator.mediaSession.setActionHandler("nexttrack", nextTrack);
+      navigator.mediaSession.setActionHandler("seekto", details => { if (Number.isFinite(details.seekTime)) audio.currentTime = details.seekTime; });
+    }
     await audio.play();
     state.history = [track.id, ...state.history.filter(id => id !== track.id)].slice(0, 100);
     localStorage.setItem("gmd-history", JSON.stringify(state.history));
@@ -282,22 +302,22 @@ $("#volume").addEventListener("input", event => audio.volume = Number(event.targ
 $("#shuffle-button").addEventListener("click", () => { state.shuffle = !state.shuffle; $("#shuffle-button").classList.toggle("active", state.shuffle); toast(state.shuffle ? "Modo aleatório ativado." : "Modo aleatório desativado."); });
 $("#repeat-button").addEventListener("click", () => { state.repeat = state.repeat === "off" ? "all" : state.repeat === "all" ? "one" : "off"; $("#repeat-button").textContent = state.repeat === "one" ? "↻¹" : "↻"; toast(`Repetição: ${state.repeat === "off" ? "desligada" : state.repeat === "all" ? "todas" : "uma faixa"}.`); });
 function nextTrack() {
-  if (!state.tracks.length) return;
+  if (!state.queue.length) return;
   let index;
-  if (state.shuffle && state.tracks.length > 1) {
-    const choices = state.tracks.map((_, i) => i).filter(i => i !== state.currentIndex);
+  if (state.shuffle && state.queue.length > 1) {
+    const choices = state.queue.map((_, i) => i).filter(i => i !== state.currentIndex);
     index = choices[Math.floor(Math.random() * choices.length)];
-  } else if (state.currentIndex + 1 < state.tracks.length) index = state.currentIndex + 1;
+  } else if (state.currentIndex + 1 < state.queue.length) index = state.currentIndex + 1;
   else if (state.repeat === "all") index = 0;
   else { audio.pause(); audio.currentTime = 0; return; }
-  playTrack(state.tracks[index], state.tracks);
+  playTrack(state.queue[index], state.queue);
 }
 function previousTrack() {
   if (audio.currentTime > 3) { audio.currentTime = 0; return; }
-  if (!state.tracks.length) return;
-  let index = state.shuffle && state.tracks.length > 1 ? Math.floor(Math.random() * state.tracks.length) : state.currentIndex - 1;
-  if (index < 0) index = state.repeat === "all" ? state.tracks.length - 1 : 0;
-  playTrack(state.tracks[index], state.tracks);
+  if (!state.queue.length) return;
+  let index = state.shuffle && state.queue.length > 1 ? Math.floor(Math.random() * state.queue.length) : state.currentIndex - 1;
+  if (index < 0) index = state.repeat === "all" ? state.queue.length - 1 : 0;
+  playTrack(state.queue[index], state.queue);
 }
 $("#next-button").addEventListener("click", nextTrack);
 $("#previous-button").addEventListener("click", previousTrack);
