@@ -167,14 +167,14 @@ async def health() -> dict[str, str]:
 
 
 def build_archive_search_query(term: str) -> str:
-    """Busca a expressão completa e também combina termos em campos descritivos."""
-    fields = ("title", "subject", "creator", "description", "identifier")
+    """Prioriza título e assunto para reduzir resultados sem relação com o jogo."""
+    fields = ("title", "subject")
     escaped_phrase = term.replace("\\", "\\\\").replace('"', '\\"')
     phrase_clause = " OR ".join(f'{field}:"{escaped_phrase}"' for field in fields)
 
-    # Cada palavra pode aparecer em um campo diferente: por exemplo, o jogo
-    # no assunto e o nome da trilha no título. Os tokens vêm de regex alfanumérica,
-    # portanto não podem introduzir operadores Lucene.
+    # Todos os termos precisam aparecer no título e/ou assunto. Não usamos
+    # creator/description/identifier como correspondência ampla, pois isso
+    # traz nomes de usuários e descrições sem relação com a trilha.
     tokens = [
         token for token in dict.fromkeys(re.findall(r"[\w]+", term, flags=re.UNICODE))
         if token.upper() not in {"AND", "OR", "NOT"}
@@ -187,6 +187,11 @@ def build_archive_search_query(term: str) -> str:
     if token_groups:
         clauses.append("(" + " AND ".join(token_groups) + ")")
     return f"mediatype:audio AND licenseurl:* AND ({' OR '.join(clauses)})"
+
+
+def exceeds_download_limit(raw_size: str | None) -> bool:
+    """Indica se o tamanho declarado ultrapassa o limite de download."""
+    return bool(raw_size and raw_size.isdigit() and int(raw_size) > MAX_DOWNLOAD_BYTES)
 
 
 @app.get("/api/search")
@@ -229,9 +234,12 @@ async def item_details(identifier: str, search_license_url: str | None = None, _
         private_flag = str(item.get("private", "")).lower()
         if not filename or not valid_mp3_filename(filename) or (source or "").lower() == "metadata" or private_flag in {"true", "1", "yes"}:
             continue
+        file_size = clean_string(item.get("size"))
+        if exceeds_download_limit(file_size):
+            continue
         files.append({
             "filename": filename,
-            "size": clean_string(item.get("size")),
+            "size": file_size,
             "format": clean_string(item.get("format")),
             "license": license_assessment(search_license_url, search_license),
         })
