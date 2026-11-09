@@ -36,12 +36,13 @@
       <section id="search-view" class="view active">
         <div class="hero">
           <div class="hero-copy">
-            <span class="pill">INTERNET ARCHIVE</span>
+            <span class="pill">DUAS FONTES DE ÁUDIO</span>
             <h2>Reviva os mundos<br><em>através da música.</em></h2>
             <p>Pesquise trilhas, consulte os arquivos e confira as licenças antes de baixar.</p>
             <form id="search-form" class="search-form">
               <span aria-hidden="true">⌕</span>
               <input id="search-input" type="search" maxlength="160" placeholder="Nome do jogo, trilha ou artista..." autocomplete="off" required>
+              <select id="search-source" aria-label="Fonte da pesquisa"><option value="archive">Internet Archive</option><option value="openverse">Openverse</option></select>
               <button class="primary-button" type="submit">Pesquisar</button>
             </form>
           </div>
