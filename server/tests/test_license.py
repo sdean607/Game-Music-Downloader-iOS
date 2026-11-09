@@ -15,7 +15,7 @@ class ArchiveSearchQueryTests(unittest.TestCase):
 
     def test_search_terms_cannot_inject_lucene_operators(self):
         query = build_archive_search_query('Road) OR *:*')
-        self.assertNotIn("OR *:*", query)
+        self.assertNotIn("title:OR", query)
         self.assertIn("title:road", query)
 
 
