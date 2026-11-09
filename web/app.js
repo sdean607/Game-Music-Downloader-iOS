@@ -100,12 +100,14 @@ async function refreshLibrary() {
 $("#search-form").addEventListener("submit", async event => {
   event.preventDefault();
   const term = $("#search-input").value.trim();
+  const source = $("#search-source").value;
   if (!term) return;
   $("#results-title").textContent = `Pesquisando “${term}”`;
   $("#search-results").className = "results-grid empty-panel";
-  $("#search-results").innerHTML = "<p>Consultando o Internet Archive...</p>";
+  $("#search-results").innerHTML = `<p>Consultando ${source === "openverse" ? "Openverse" : "Internet Archive"}...</p>`;
   try {
-    const data = await api(`/api/search?q=${encodeURIComponent(term)}`);
+    const endpoint = source === "openverse" ? "/api/openverse/search" : "/api/search";
+    const data = await api(`${endpoint}?q=${encodeURIComponent(term)}`);
     $("#results-title").textContent = "Resultados da pesquisa";
     $("#results-count").textContent = `${data.results.length} itens`;
     if (!data.results.length) {
@@ -114,14 +116,15 @@ $("#search-form").addEventListener("submit", async event => {
       return;
     }
     $("#search-results").className = "results-grid";
-    $("#search-results").innerHTML = data.results.map(item => `
-      <article class="result-card">
-        <span class="eyebrow">INTERNET ARCHIVE</span>
-        <h3>${escapeHTML(item.title)}</h3>
-        <p>${escapeHTML(item.creator)}</p>
-        <div class="result-meta"><span>Licença declarada</span><button class="text-button" data-item="${escapeHTML(item.identifier)}" data-license="${escapeHTML(item.licenseURL || "")}">Ver arquivos →</button></div>
-      </article>`).join("");
-    $("#search-results").querySelectorAll("[data-item]").forEach(button => button.addEventListener("click", () => openItem(button.dataset.item, button.dataset.license)));
+    $("#search-results").innerHTML = data.results.map(item => {
+      const openverse = source === "openverse";
+      const licenseLabel = openverse ? (item.license?.name || "Licença não confirmada") : "Licença declarada";
+      return `<article class="result-card"><span class="eyebrow">${openverse ? "OPENVERSE" : "INTERNET ARCHIVE"}</span><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.creator)}</p><div class="result-meta"><span>${escapeHTML(licenseLabel)}</span><button class="text-button" data-source="${source}" data-item="${escapeHTML(item.identifier)}" data-license="${escapeHTML(item.licenseURL || "")}">Ver detalhes →</button></div></article>`;
+    }).join("");
+    $("#search-results").querySelectorAll("[data-item]").forEach(button => button.addEventListener("click", () => {
+      if (button.dataset.source === "openverse") openOpenverseItem(button.dataset.item, button.dataset.license);
+      else openItem(button.dataset.item, button.dataset.license);
+    }));
   } catch (error) {
     $("#search-results").className = "empty-panel";
     $("#search-results").textContent = error.message;
@@ -157,6 +160,42 @@ async function openItem(identifier, searchLicense) {
     panel.innerHTML = `<p class="error-text">${escapeHTML(error.message)}</p>`;
   }
 }
+
+async function openOpenverseItem(identifier, searchLicense) {
+  const panel = $("#detail-panel");
+  panel.hidden = false;
+  panel.innerHTML = "<p>Consultando novamente os metadados e a licença no Openverse...</p>";
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  try {
+    const item = await api(`/api/openverse/items/${encodeURIComponent(identifier)}?search_license_url=${encodeURIComponent(searchLicense || "")}`);
+    const file = item.file || {};
+    const license = file.license || {};
+    const allowed = Boolean(file.eligible && license.canOfferDownload);
+    panel.innerHTML = `<div class="detail-head"><div><span class="eyebrow">DETALHES DO OPENVERSE</span><h2>${escapeHTML(item.title)}</h2><p class="detail-muted">${escapeHTML(item.creator)} · ${escapeHTML(item.provider || "Openverse")}</p></div><button id="close-detail" class="ghost-button">Fechar</button></div><p class="detail-muted"><a href="${escapeHTML(item.itemURL || "https://openverse.org/")}" target="_blank" rel="noopener">Abrir página original do áudio ↗</a></p><div class="file-row"><div><strong>Arquivo MP3</strong><div class="detail-muted">${file.size ? (Number(file.size) / 1048576).toFixed(1) + " MB" : "Tamanho não informado"} · <span class="${allowed ? "license-ok" : "license-no"}">${escapeHTML(license.name || "Licença não confirmada")}</span></div><p class="detail-muted">${escapeHTML(license.message || file.reason || "Não foi possível validar o arquivo.")}</p></div><div>${allowed ? '<button id="openverse-download" class="primary-button">Confirmar e baixar</button>' : '<span class="license-no">Download bloqueado</span>'}</div></div><p class="detail-muted">O Openverse não garante que a licença declarada pelo uploader seja verdadeira. Confira a página original, a licença e a autorização de quem enviou o áudio antes de salvar.</p>`;
+    $("#close-detail").addEventListener("click", () => panel.hidden = true);
+    const button = $("#openverse-download");
+    if (button) button.addEventListener("click", () => downloadOpenverse(identifier, searchLicense, button));
+  } catch (error) {
+    panel.innerHTML = `<p class="error-text">${escapeHTML(error.message)}</p>`;
+  }
+}
+async function downloadOpenverse(identifier, searchLicense, button) {
+  const confirmation = "Confirme que você verificou a página original, a licença e que o uploader tinha autorização para disponibilizar este áudio. Deseja continuar?";
+  if (!window.confirm(confirmation)) return;
+  button.disabled = true;
+  button.textContent = "Baixando...";
+  try {
+    const data = await api("/api/openverse/download", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ identifier, search_license_url: searchLicense, confirmed: true }) });
+    toast(data.message);
+    await refreshLibrary();
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Confirmar e baixar";
+  }
+}
+
 async function downloadFile(identifier, filename, searchLicense, button) {
   const confirmation = "Confirme que você verificou a página do item, a licença e que o uploader tinha autorização para disponibilizar este áudio. Deseja continuar?";
   if (!window.confirm(confirmation)) return;
