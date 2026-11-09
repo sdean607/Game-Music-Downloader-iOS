@@ -194,8 +194,8 @@ function bindTrackActions(container, tracks) {
   }));
   container.querySelectorAll(".playlist-track").forEach(button => button.addEventListener("click", () => {
     if (!state.playlists.length) { toast("Crie uma playlist primeiro."); setView("playlists"); return; }
-    const choices = state.playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");
-    const answer = prompt(`Adicionar a qual playlist?\\n${choices}\\nDigite o número:`);
+    const choices = state.playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\n");
+    const answer = prompt(`Adicionar a qual playlist?\n${choices}\nDigite o número:`);
     const index = Number(answer) - 1;
     if (!Number.isInteger(index) || !state.playlists[index]) return;
     const list = state.playlists[index];
