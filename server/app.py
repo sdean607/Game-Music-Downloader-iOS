@@ -124,7 +124,7 @@ def license_assessment(search_url: str | None, metadata_url: str | None) -> dict
     return {**blocked, "name": "Licença não aceita automaticamente", "message": "A licença está fora da lista permitida nesta versão. O download não será oferecido.", "licenseURL": url}
 
 
-async def archive_json(url: str, params: dict[str, str] | None = None) -> dict[str, Any]:
+async def archive_json(url: str, params: dict[str, str] | list[tuple[str, str]] | None = None) -> dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=45, follow_redirects=True) as client:
             response = await client.get(url, params=params, headers={"User-Agent": "GameMusicDownloader/1.0"})
@@ -172,12 +172,8 @@ async def search_archive(q: str, _: str = Depends(require_auth)) -> dict[str, An
         raise HTTPException(status_code=400, detail="Digite um termo de pesquisa válido (até 160 caracteres).")
     escaped = term.replace("\\", "\\\\").replace('"', '\\"')
     lucene = f'mediatype:audio AND (title:"{escaped}" OR subject:"{escaped}") AND licenseurl:*'
-    params = {
-        "q": lucene,
-        "rows": "30",
-        "output": "json",
-        "fl[]": "identifier,title,creator,licenseurl",
-    }
+    params = [("q", lucene), ("rows", "30"), ("output", "json")]
+    params.extend(("fl[]", field) for field in ("identifier", "title", "creator", "licenseurl"))
     payload = await archive_json("https://archive.org/advancedsearch.php", params)
     docs = payload.get("response", {}).get("docs", [])
     results = []
@@ -195,7 +191,7 @@ async def search_archive(q: str, _: str = Depends(require_auth)) -> dict[str, An
 
 
 @app.get("/api/items/{identifier}")
-async def item_details(identifier: str, _: str = Depends(require_auth)) -> dict[str, Any]:
+async def item_details(identifier: str, search_license_url: str | None = None, _: str = Depends(require_auth)) -> dict[str, Any]:
     if not valid_identifier(identifier):
         raise HTTPException(status_code=400, detail="Identificador do Internet Archive inválido.")
     payload = await archive_json(f"https://archive.org/metadata/{quote(identifier, safe='')}")
@@ -208,13 +204,13 @@ async def item_details(identifier: str, _: str = Depends(require_auth)) -> dict[
         filename = clean_string(item.get("name"))
         source = clean_string(item.get("source"))
         private_flag = str(item.get("private", "")).lower()
-        if not filename or not valid_mp3_filename(filename) or source == "metadata" or private_flag in {"true", "1", "yes"}:
+        if not filename or not valid_mp3_filename(filename) or (source or "").lower() == "metadata" or private_flag in {"true", "1", "yes"}:
             continue
         files.append({
             "filename": filename,
             "size": clean_string(item.get("size")),
             "format": clean_string(item.get("format")),
-            "license": license_assessment(search_license, search_license),
+            "license": license_assessment(search_license_url, search_license),
         })
     return {
         "identifier": identifier,
@@ -251,7 +247,7 @@ async def download_track(body: DownloadRequest, _: str = Depends(require_auth)) 
         raise HTTPException(status_code=404, detail="Arquivo MP3 não encontrado nos metadados atuais.")
     if str(selected.get("private", "")).lower() in {"true", "1", "yes"} or clean_string(selected.get("source")) == "metadata":
         raise HTTPException(status_code=403, detail="O arquivo está privado ou não é um arquivo de áudio público.")
-    declared_size = clean_string(selected.get("size"))
+    existing_tracks = await load_library()\n    if any(item.get("archiveIdentifier") == body.identifier and item.get("filename", "").endswith("_" + body.filename) for item in existing_tracks):\n        raise HTTPException(status_code=409, detail="Esta faixa já está na biblioteca.")\n    declared_size = clean_string(selected.get("size"))
     if declared_size and declared_size.isdigit() and int(declared_size) > MAX_DOWNLOAD_BYTES:
         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
 
