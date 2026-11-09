@@ -266,12 +266,41 @@ async def validate_public_media_url(raw_url: str) -> tuple[str, ipaddress.IPv4Ad
         raise HTTPException(status_code=400, detail="O endereço do arquivo não é um destino HTTPS público válido.") from exc
 
 
+async def write_mp3_payload(content: Any, temporary: Path) -> int:
+    """Grava o fluxo em disco, validando a assinatura e limpando em qualquer interrupção."""
+    received = 0
+    prefix = bytearray()
+    try:
+        with temporary.open("wb") as output:
+            async for chunk in content.iter_chunked(64 * 1024):
+                if len(prefix) < 3:
+                    needed = 3 - len(prefix)
+                    prefix.extend(chunk[:needed])
+                    chunk = chunk[needed:]
+                    if len(prefix) >= 3 and not has_mp3_signature(bytes(prefix)):
+                        raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                if chunk:
+                    received += len(chunk)
+                    if received + len(prefix) > MAX_DOWNLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
+                    output.write(chunk)
+            if prefix:
+                if not has_mp3_signature(bytes(prefix)):
+                    raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                output.write(prefix)
+                received += len(prefix)
+        if received <= 0:
+            raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
+        return received
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
 async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
     current_url = raw_url
-    received = 0
     try:
         for _ in range(6):
-            parsed = urlsplit(current_url)
             hostname, pinned_ip = await validate_public_media_url(current_url)
             resolver = PinnedIPResolver(hostname, pinned_ip)
             connector = aiohttp.TCPConnector(resolver=resolver, use_dns_cache=False, ssl=True)
@@ -293,35 +322,11 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
                     declared_length = response.headers.get("content-length")
                     if declared_length and declared_length.isdigit() and int(declared_length) > MAX_DOWNLOAD_BYTES:
                         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
-                    prefix = bytearray()
-                    with temporary.open("wb") as output:
-                        async for chunk in response.content.iter_chunked(64 * 1024):
-                            if len(prefix) < 3:
-                                needed = 3 - len(prefix)
-                                prefix.extend(chunk[:needed])
-                                chunk = chunk[needed:]
-                                if len(prefix) >= 3 and not has_mp3_signature(bytes(prefix)):
-                                    raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
-                            if chunk:
-                                received += len(chunk)
-                                if received + len(prefix) > MAX_DOWNLOAD_BYTES:
-                                    raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
-                                output.write(chunk)
-                        if prefix:
-                            if not has_mp3_signature(bytes(prefix)):
-                                raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
-                            output.write(prefix)
-                            received += len(prefix)
-                    if received <= 0:
-                        raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
-                    return received
+                    return await write_mp3_payload(response.content, temporary)
         raise HTTPException(status_code=502, detail="O provedor excedeu o limite de redirecionamentos.")
-    except HTTPException:
+    except BaseException:
         temporary.unlink(missing_ok=True)
         raise
-    except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
-        temporary.unlink(missing_ok=True)
-        raise HTTPException(status_code=502, detail="Falha ao baixar o áudio do provedor.") from exc
 
 
 @app.get("/api/health")
@@ -565,7 +570,7 @@ async def download_openverse_track(body: OpenverseDownloadRequest, _: str = Depe
         tracks = await load_library()
         tracks.insert(0, track)
         await save_library(tracks)
-    except Exception:
+    except BaseException:
         temporary.unlink(missing_ok=True)
         destination.unlink(missing_ok=True)
         raise
