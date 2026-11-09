@@ -71,7 +71,7 @@ document.querySelectorAll(".nav-button").forEach(button => button.addEventListen
 $("#login-form").addEventListener("submit", async event => {
   event.preventDefault();
   const password = $("#password-input").value;
-  state.auth = btoa(`admin:${password}`);
+  state.auth = btoa(String.fromCharCode(...new TextEncoder().encode(`admin:${password}`)));
   try {
     await api("/api/library");
     sessionStorage.setItem("gmd-auth", state.auth);
@@ -132,7 +132,7 @@ async function openItem(identifier, searchLicense) {
   panel.innerHTML = "<p>Consultando metadados e verificando arquivos MP3...</p>";
   panel.scrollIntoView({ behavior: "smooth", block: "start" });
   try {
-    const item = await api(`/api/items/${encodeURIComponent(identifier)}`);
+    const item = await api(`/api/items/${encodeURIComponent(identifier)}?search_license_url=${encodeURIComponent(searchLicense || "")}`);
     panel.innerHTML = `
       <div class="detail-head"><div><span class="eyebrow">DETALHES DO ITEM</span><h2>${escapeHTML(item.title)}</h2><p class="detail-muted">${escapeHTML(item.creator)} · ${escapeHTML(item.identifier)}</p></div><button id="close-detail" class="ghost-button">Fechar</button></div>
       <p class="detail-muted"><a href="${escapeHTML(item.itemURL)}" target="_blank" rel="noopener">Abrir página original no Internet Archive ↗</a></p>
@@ -146,7 +146,7 @@ async function openItem(identifier, searchLicense) {
     }
     list.innerHTML = item.files.map(file => {
       const license = file.license;
-      const allowed = license.canOfferDownload && searchLicense && license.licenseURL;
+      const allowed = license.canOfferDownload;
       const size = file.size && /^\d+$/.test(file.size) ? `${(Number(file.size) / 1048576).toFixed(1)} MB` : "Tamanho não informado";
       return `<div class="file-row"><div><strong>${escapeHTML(file.filename)}</strong><div class="detail-muted">${size} · <span class="${allowed ? "license-ok" : "license-no"}">${escapeHTML(license.name)}</span></div><p class="detail-muted">${escapeHTML(license.message)}</p></div><div>${allowed ? `<button class="primary-button download-button" data-file="${escapeHTML(file.filename)}">Confirmar e baixar</button>` : '<span class="license-no">Download bloqueado</span>'}</div></div>`;
     }).join("");
@@ -180,7 +180,7 @@ function emptyState(message) {
   return `<div class="empty-panel"><div class="empty-icon">♫</div><h3>${message}</h3><p>Suas músicas aparecerão aqui depois de baixadas.</p></div>`;
 }
 function trackCard(track, index, actions = true) {
-  return `<article class="track-card"><div class="cover-small">♫</div><div class="track-info"><strong>${escapeHTML(track.title)}</strong><small>${escapeHTML(track.artist)} · ${escapeHTML(track.game)}</small></div><div class="track-actions"><button class="icon-button play-track" data-index="${index}" aria-label="Reproduzir">▶</button>${actions ? `<button class="icon-button favorite-track" data-id="${escapeHTML(track.id)}" aria-label="Favoritar">${state.favorites.has(track.id) ? "♥" : "♡"}</button><button class="icon-button delete-track" data-id="${escapeHTML(track.id)}" aria-label="Excluir">⌫</button>` : ""}</div></article>`;
+  return `<article class="track-card"><div class="cover-small">♫</div><div class="track-info"><strong>${escapeHTML(track.title)}</strong><small>${escapeHTML(track.artist)} · ${escapeHTML(track.game)}</small></div><div class="track-actions"><button class="icon-button play-track" data-index="${index}" aria-label="Reproduzir">▶</button>${actions ? `<button class="icon-button favorite-track" data-id="${escapeHTML(track.id)}" aria-label="Favoritar">${state.favorites.has(track.id) ? "♥" : "♡"}</button><button class="icon-button playlist-track" data-id="${escapeHTML(track.id)}" aria-label="Adicionar a playlist">＋</button><button class="icon-button delete-track" data-id="${escapeHTML(track.id)}" aria-label="Excluir">⌫</button>` : ""}</div></article>`;
 }
 function bindTrackActions(container, tracks) {
   container.querySelectorAll(".play-track").forEach(button => button.addEventListener("click", () => playTrack(tracks[Number(button.dataset.index)], tracks)));
@@ -191,7 +191,7 @@ function bindTrackActions(container, tracks) {
     renderLibrary();
     renderFavorites();
   }));
-  container.querySelectorAll(".delete-track").forEach(button => button.addEventListener("click", async () => {
+  container.querySelectorAll(".playlist-track").forEach(button => button.addEventListener("click", () => {\n    if (!state.playlists.length) { toast("Crie uma playlist primeiro."); setView("playlists"); return; }\n    const choices = state.playlists.map((list, index) => `${index + 1}. ${list.name}`).join("\\n");\n    const answer = prompt(`Adicionar a qual playlist?\\n${choices}\\nDigite o número:`);\n    const index = Number(answer) - 1;\n    if (!Number.isInteger(index) || !state.playlists[index]) return;\n    const list = state.playlists[index];\n    if (!list.ids.includes(button.dataset.id)) list.ids.push(button.dataset.id);\n    savePlaylists(); toast(`Adicionada à playlist ${list.name}.`);\n  }));\n  container.querySelectorAll(".delete-track").forEach(button => button.addEventListener("click", async () => {
     if (!confirm("Excluir esta música do servidor?")) return;
     try { await api(`/api/library/${encodeURIComponent(button.dataset.id)}`, { method: "DELETE" }); await refreshLibrary(); toast("Música removida."); }
     catch (error) { toast(error.message); }
@@ -271,7 +271,7 @@ audio.addEventListener("pause", () => $("#play-button").textContent = "▶");
 audio.addEventListener("timeupdate", () => {
   $("#current-time").textContent = formatTime(audio.currentTime);
   $("#duration").textContent = formatTime(audio.duration);
-  $("#seek").value = audio.duration ? String(audio.currentTime / audio.duration * 100) : "0";
+  $("#seek").value = audio.duration ? String(audio.currentTime / audio.duration * 100) : "0";\n  if ("mediaSession" in navigator && audio.duration) navigator.mediaSession.setPositionState({ duration: audio.duration, playbackRate: audio.playbackRate, position: audio.currentTime });
 });
 audio.addEventListener("ended", () => {
   if (state.repeat === "one") { audio.currentTime = 0; audio.play(); return; }
