@@ -1,6 +1,6 @@
 import unittest
 
-from app import build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id, has_mp3_signature
+from app import PinnedIPResolver, build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id, has_mp3_signature
 
 
 class ArchiveSearchQueryTests(unittest.TestCase):
@@ -29,6 +29,21 @@ class ArchiveSearchQueryTests(unittest.TestCase):
         self.assertFalse(exceeds_download_limit("unknown"))
 
 
+class PinnedResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resolver_returns_only_the_validated_ip(self):
+        import ipaddress
+        resolver = PinnedIPResolver("media.example", ipaddress.ip_address("93.184.216.34"))
+        result = await resolver.resolve("media.example", 443)
+        self.assertEqual(result[0]["host"], "93.184.216.34")
+        self.assertEqual(result[0]["hostname"], "media.example")
+
+    async def test_resolver_rejects_a_different_hostname(self):
+        import ipaddress
+        resolver = PinnedIPResolver("media.example", ipaddress.ip_address("93.184.216.34"))
+        with self.assertRaises(OSError):
+            await resolver.resolve("attacker.example", 443)
+
+
 class OpenverseMetadataTests(unittest.TestCase):
     def test_supported_license_slugs_are_mapped(self):
         self.assertEqual(openverse_license_url({"license": "cc0"}), "https://creativecommons.org/publicdomain/zero/1.0/")
@@ -45,7 +60,7 @@ class OpenverseMetadataTests(unittest.TestCase):
         self.assertFalse(valid_openverse_id("../private"))
 
     def test_mp3_payload_signature_is_checked(self):
-        self.assertTrue(has_mp3_signature(b"ID3\\x04\\x00\\x00"))
+        self.assertTrue(has_mp3_signature(b"ID3\x04\x00\x00"))
         self.assertTrue(has_mp3_signature(bytes([0xFF, 0xFB, 0x90, 0x64])))
         self.assertFalse(has_mp3_signature(b"<!DOCTYPE html>"))
         self.assertFalse(has_mp3_signature(b""))
