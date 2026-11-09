@@ -8,18 +8,20 @@ class ArchiveSearchQueryTests(unittest.TestCase):
         query = build_archive_search_query("Road Rash Jailbreak")
         self.assertIn('title:"Road Rash Jailbreak"', query)
         self.assertIn('subject:"Road Rash Jailbreak"', query)
-        self.assertIn("title:road", query)
-        self.assertIn("subject:jailbreak", query)
-        self.assertNotIn("creator:", query)
-        self.assertNotIn("description:", query)
-        self.assertNotIn("identifier:", query)
+        query_lower = query.lower()
+        self.assertIn("title:road", query_lower)
+        self.assertIn("subject:jailbreak", query_lower)
+        self.assertNotIn("creator:", query_lower)
+        self.assertNotIn("description:", query_lower)
+        self.assertNotIn("identifier:", query_lower)
         self.assertIn("mediatype:audio", query)
         self.assertIn("licenseurl:*", query)
 
     def test_search_terms_cannot_inject_lucene_operators(self):
         query = build_archive_search_query('Road) OR *:*')
-        self.assertNotIn("title:OR", query)
-        self.assertIn("title:road", query)
+        query_lower = query.lower()
+        self.assertNotIn("title:or", query_lower)
+        self.assertIn("title:road", query_lower)
 
     def test_oversized_files_are_excluded(self):
         self.assertTrue(exceeds_download_limit(str(150 * 1024 * 1024 + 1)))
