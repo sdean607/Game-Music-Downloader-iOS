@@ -14,6 +14,8 @@ from typing import Any
 from urllib.parse import quote, urljoin, urlsplit
 
 import httpx
+import aiohttp
+from aiohttp.abc import AbstractResolver
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -221,17 +223,45 @@ def has_mp3_signature(header: bytes) -> bool:
     return len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
 
 
-async def validate_public_media_url(raw_url: str) -> str:
+class PinnedIPResolver(AbstractResolver):
+    """Resolve apenas para o IP público já validado; preserva Host e TLS SNI originais."""
+
+    def __init__(self, hostname: str, address: ipaddress.IPv4Address | ipaddress.IPv6Address):
+        self.hostname = hostname.lower()
+        self.address = address
+
+    async def resolve(self, host: str, port: int = 0, family: int = socket.AF_INET) -> list[dict[str, Any]]:
+        if host.lower() != self.hostname:
+            raise OSError("Tentativa de resolver host diferente do validado.")
+        return [{
+            "hostname": host,
+            "host": str(self.address),
+            "port": port,
+            "family": socket.AF_INET6 if self.address.version == 6 else socket.AF_INET,
+            "proto": 0,
+            "flags": socket.AI_NUMERICHOST,
+        }]
+
+    async def close(self) -> None:
+        return None
+
+
+async def validate_public_media_url(raw_url: str) -> tuple[str, ipaddress.IPv4Address | ipaddress.IPv6Address]:
     try:
         parsed = urlsplit(raw_url)
-        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
+        if parsed.scheme.lower() != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
             raise ValueError("URL inválida")
         if parsed.hostname.lower() in {"localhost", "localhost.localdomain"}:
             raise ValueError("host local")
-        addresses = await asyncio.to_thread(socket.getaddrinfo, parsed.hostname, 443, type=socket.SOCK_STREAM)
-        if not addresses or any(not ipaddress.ip_address(entry[4][0]).is_global for entry in addresses):
+        try:
+            literal = ipaddress.ip_address(parsed.hostname)
+            candidates = [literal]
+        except ValueError:
+            records = await asyncio.to_thread(socket.getaddrinfo, parsed.hostname, 443, type=socket.SOCK_STREAM)
+            candidates = list(dict.fromkeys(ipaddress.ip_address(entry[4][0]) for entry in records))
+        if not candidates or any(not address.is_global for address in candidates):
             raise ValueError("endereço não público")
-        return raw_url
+        return parsed.hostname, candidates[0]
     except (ValueError, OSError, socket.gaierror) as exc:
         raise HTTPException(status_code=400, detail="O endereço do arquivo não é um destino HTTPS público válido.") from exc
 
@@ -240,17 +270,22 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
     current_url = raw_url
     received = 0
     try:
-        async with httpx.AsyncClient(timeout=120, follow_redirects=False) as client:
-            for _ in range(6):
-                await validate_public_media_url(current_url)
-                async with client.stream("GET", current_url, headers={"User-Agent": "GameMusicDownloader/1.0"}) as response:
-                    if response.is_redirect:
+        for _ in range(6):
+            parsed = urlsplit(current_url)
+            hostname, pinned_ip = await validate_public_media_url(current_url)
+            resolver = PinnedIPResolver(hostname, pinned_ip)
+            connector = aiohttp.TCPConnector(resolver=resolver, use_dns_cache=False, ssl=True)
+            timeout = aiohttp.ClientTimeout(total=120, connect=20, sock_read=60)
+            async with aiohttp.ClientSession(connector=connector, timeout=timeout, trust_env=False, auto_decompress=False) as client:
+                async with client.get(current_url, headers={"User-Agent": "GameMusicDownloader/1.0"}, allow_redirects=False) as response:
+                    if response.status in {301, 302, 303, 307, 308}:
                         location = response.headers.get("location")
                         if not location:
                             raise HTTPException(status_code=502, detail="Redirecionamento inválido do provedor de áudio.")
                         current_url = urljoin(current_url, location)
                         continue
-                    response.raise_for_status()
+                    if response.status >= 400:
+                        raise HTTPException(status_code=502, detail="O provedor de áudio recusou o download.")
                     mime = (response.headers.get("content-type") or "").split(";")[0].lower()
                     accepted = {"audio/mpeg", "audio/mp3", "audio/x-mpeg", "audio/x-mp3", "application/octet-stream", "binary/octet-stream"}
                     if mime and mime not in accepted:
@@ -260,7 +295,7 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
                         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
                     prefix = bytearray()
                     with temporary.open("wb") as output:
-                        async for chunk in response.aiter_bytes(64 * 1024):
+                        async for chunk in response.content.iter_chunked(64 * 1024):
                             if len(prefix) < 3:
                                 needed = 3 - len(prefix)
                                 prefix.extend(chunk[:needed])
@@ -280,11 +315,11 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
                     if received <= 0:
                         raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
                     return received
-            raise HTTPException(status_code=502, detail="O provedor excedeu o limite de redirecionamentos.")
+        raise HTTPException(status_code=502, detail="O provedor excedeu o limite de redirecionamentos.")
     except HTTPException:
         temporary.unlink(missing_ok=True)
         raise
-    except (httpx.HTTPError, OSError) as exc:
+    except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
         temporary.unlink(missing_ok=True)
         raise HTTPException(status_code=502, detail="Falha ao baixar o áudio do provedor.") from exc
 
