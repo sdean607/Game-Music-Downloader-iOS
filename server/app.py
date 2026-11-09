@@ -166,14 +166,36 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "app": "Game Music Downloader"}
 
 
+def build_archive_search_query(term: str) -> str:
+    """Busca a expressão completa e também combina termos em campos descritivos."""
+    fields = ("title", "subject", "creator", "description", "identifier")
+    escaped_phrase = term.replace("\\", "\\\\").replace('"', '\\"')
+    phrase_clause = " OR ".join(f'{field}:"{escaped_phrase}"' for field in fields)
+
+    # Cada palavra pode aparecer em um campo diferente: por exemplo, o jogo
+    # no assunto e o nome da trilha no título. Os tokens vêm de regex alfanumérica,
+    # portanto não podem introduzir operadores Lucene.
+    tokens = [
+        token for token in dict.fromkeys(re.findall(r"[\w]+", term, flags=re.UNICODE))
+        if token.upper() not in {"AND", "OR", "NOT"}
+    ]
+    token_groups = [
+        "(" + " OR ".join(f"{field}:{token}" for field in fields) + ")"
+        for token in tokens
+    ]
+    clauses = [phrase_clause]
+    if token_groups:
+        clauses.append("(" + " AND ".join(token_groups) + ")")
+    return f"mediatype:audio AND licenseurl:* AND ({' OR '.join(clauses)})"
+
+
 @app.get("/api/search")
 async def search_archive(q: str, _: str = Depends(require_auth)) -> dict[str, Any]:
     term = q.strip()
     if not term or len(term) > 160:
         raise HTTPException(status_code=400, detail="Digite um termo de pesquisa válido (até 160 caracteres).")
-    escaped = term.replace("\\", "\\\\").replace('"', '\\"')
-    lucene = f'mediatype:audio AND (title:"{escaped}" OR subject:"{escaped}") AND licenseurl:*'
-    params = [("q", lucene), ("rows", "30"), ("output", "json")]
+    lucene = build_archive_search_query(term)
+    params = [("q", lucene), ("rows", "50"), ("output", "json")]
     params.extend(("fl[]", field) for field in ("identifier", "title", "creator", "licenseurl"))
     payload = await archive_json("https://archive.org/advancedsearch.php", params)
     docs = payload.get("response", {}).get("docs", [])

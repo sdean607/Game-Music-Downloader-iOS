@@ -1,6 +1,22 @@
 import unittest
 
-from app import license_assessment, valid_mp3_filename, valid_identifier
+from app import build_archive_search_query, license_assessment, valid_mp3_filename, valid_identifier
+
+
+class ArchiveSearchQueryTests(unittest.TestCase):
+    def test_search_includes_title_artist_and_descriptive_fields(self):
+        query = build_archive_search_query("Road Rash Jailbreak")
+        self.assertIn('title:"Road Rash Jailbreak"', query)
+        self.assertIn("creator:road", query)
+        self.assertIn("description:jailbreak", query)
+        self.assertIn("subject:rash", query)
+        self.assertIn("mediatype:audio", query)
+        self.assertIn("licenseurl:*", query)
+
+    def test_search_terms_cannot_inject_lucene_operators(self):
+        query = build_archive_search_query('Road) OR *:*')
+        self.assertNotIn("title:OR", query)
+        self.assertIn("title:road", query)
 
 
 class LicenseAssessmentTests(unittest.TestCase):
