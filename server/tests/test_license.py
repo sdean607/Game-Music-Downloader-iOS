@@ -126,11 +126,11 @@ class ChunkedPayloadTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as folder:
             target = Path(folder) / "audio.part"
             size = await app_module.write_mp3_payload(
-                self.FakeContent([b"I", b"D", b"3", b"\\x04\\x00\\x00audio"]),
+                self.FakeContent([b"I", b"D", b"3", b"\x04\x00\x00audio"]),
                 target,
             )
             self.assertEqual(size, 11)
-            self.assertEqual(target.read_bytes(), b"ID3\\x04\\x00\\x00audio")
+            self.assertEqual(target.read_bytes(), b"ID3\x04\x00\x00audio")
 
     async def test_html_payload_is_rejected_and_removed(self):
         with tempfile.TemporaryDirectory() as folder:
