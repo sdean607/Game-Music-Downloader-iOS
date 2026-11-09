@@ -1,6 +1,6 @@
 import unittest
 
-from app import build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier
+from app import build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id
 
 
 class ArchiveSearchQueryTests(unittest.TestCase):
@@ -27,6 +27,22 @@ class ArchiveSearchQueryTests(unittest.TestCase):
         self.assertTrue(exceeds_download_limit(str(150 * 1024 * 1024 + 1)))
         self.assertFalse(exceeds_download_limit(str(150 * 1024 * 1024)))
         self.assertFalse(exceeds_download_limit("unknown"))
+
+
+class OpenverseMetadataTests(unittest.TestCase):
+    def test_supported_license_slugs_are_mapped(self):
+        self.assertEqual(openverse_license_url({"license": "cc0"}), "https://creativecommons.org/publicdomain/zero/1.0/")
+        self.assertEqual(openverse_license_url({"license": "by", "license_version": "4.0"}), "https://creativecommons.org/licenses/by/4.0/")
+        self.assertIsNone(openverse_license_url({"license": "unknown"}))
+
+    def test_only_mp3_media_is_eligible(self):
+        self.assertTrue(openverse_mp3({"filetype": "mp3"}))
+        self.assertTrue(openverse_mp3({"url": "https://media.example/audio.mp3"}))
+        self.assertFalse(openverse_mp3({"filetype": "wav", "url": "https://media.example/audio.wav"}))
+
+    def test_openverse_identifier_must_be_uuid(self):
+        self.assertTrue(valid_openverse_id("8624ba61-57f1-4f98-8a85-ece206c319cf"))
+        self.assertFalse(valid_openverse_id("../private"))
 
 
 class LicenseAssessmentTests(unittest.TestCase):
