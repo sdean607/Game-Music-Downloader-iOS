@@ -1,4 +1,11 @@
+import asyncio
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import app as app_module
+from fastapi import HTTPException
 
 from app import PinnedIPResolver, build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id, has_mp3_signature
 
@@ -101,6 +108,61 @@ class LicenseAssessmentTests(unittest.TestCase):
         self.assertTrue(valid_identifier("archive-item_01"))
         self.assertFalse(valid_identifier("../private"))
         self.assertFalse(valid_identifier(".."))
+
+
+class ChunkedPayloadTests(unittest.IsolatedAsyncioTestCase):
+    class FakeContent:
+        def __init__(self, chunks, cancel_after_chunks=False):
+            self.chunks = chunks
+            self.cancel_after_chunks = cancel_after_chunks
+
+        async def iter_chunked(self, _size):
+            for chunk in self.chunks:
+                yield chunk
+            if self.cancel_after_chunks:
+                raise asyncio.CancelledError()
+
+    async def test_mp3_header_split_across_chunks_is_accepted(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "audio.part"
+            size = await app_module.write_mp3_payload(
+                self.FakeContent([b"I", b"D", b"3", b"\\x04\\x00\\x00audio"]),
+                target,
+            )
+            self.assertEqual(size, 10)
+            self.assertEqual(target.read_bytes(), b"ID3\\x04\\x00\\x00audio")
+
+    async def test_html_payload_is_rejected_and_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "audio.part"
+            with self.assertRaises(HTTPException) as error:
+                await app_module.write_mp3_payload(self.FakeContent([b"<html>not audio"]), target)
+            self.assertEqual(error.exception.status_code, 415)
+            self.assertFalse(target.exists())
+
+    async def test_empty_payload_is_rejected_and_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "audio.part"
+            with self.assertRaises(HTTPException) as error:
+                await app_module.write_mp3_payload(self.FakeContent([]), target)
+            self.assertEqual(error.exception.status_code, 422)
+            self.assertFalse(target.exists())
+
+    async def test_oversized_payload_is_rejected_and_removed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "audio.part"
+            with patch.object(app_module, "MAX_DOWNLOAD_BYTES", 4):
+                with self.assertRaises(HTTPException) as error:
+                    await app_module.write_mp3_payload(self.FakeContent([b"ID3abc"]), target)
+            self.assertEqual(error.exception.status_code, 413)
+            self.assertFalse(target.exists())
+
+    async def test_cancelled_stream_removes_partial_file(self):
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "audio.part"
+            with self.assertRaises(asyncio.CancelledError):
+                await app_module.write_mp3_payload(self.FakeContent([b"ID3partial"], cancel_after_chunks=True), target)
+            self.assertFalse(target.exists())
 
 
 if __name__ == "__main__":
