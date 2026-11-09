@@ -175,7 +175,7 @@ def build_archive_search_query(term: str) -> str:
     # Cada palavra pode aparecer em um campo diferente: por exemplo, o jogo
     # no assunto e o nome da trilha no título. Os tokens vêm de regex alfanumérica,
     # portanto não podem introduzir operadores Lucene.
-    tokens = list(dict.fromkeys(re.findall(r"[\\w]+", term, flags=re.UNICODE)))
+    tokens = list(dict.fromkeys(re.findall(r"[\w]+", term, flags=re.UNICODE)))
     token_groups = [
         "(" + " OR ".join(f"{field}:{token}" for field in fields) + ")"
         for token in tokens
