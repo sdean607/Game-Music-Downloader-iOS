@@ -37,6 +37,7 @@ class LicenseAssessmentTests(unittest.TestCase):
         self.assertFalse(valid_mp3_filename("track.wav"))
         self.assertTrue(valid_identifier("archive-item_01"))
         self.assertFalse(valid_identifier("../private"))
+        self.assertFalse(valid_identifier(".."))
 
 
 if __name__ == "__main__":
