@@ -1,6 +1,6 @@
 import unittest
 
-from app import build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id
+from app import build_archive_search_query, exceeds_download_limit, license_assessment, valid_mp3_filename, valid_identifier, openverse_license_url, openverse_mp3, valid_openverse_id, has_mp3_signature
 
 
 class ArchiveSearchQueryTests(unittest.TestCase):
@@ -43,6 +43,12 @@ class OpenverseMetadataTests(unittest.TestCase):
     def test_openverse_identifier_must_be_uuid(self):
         self.assertTrue(valid_openverse_id("8624ba61-57f1-4f98-8a85-ece206c319cf"))
         self.assertFalse(valid_openverse_id("../private"))
+
+    def test_mp3_payload_signature_is_checked(self):
+        self.assertTrue(has_mp3_signature(b"ID3\\x04\\x00\\x00"))
+        self.assertTrue(has_mp3_signature(bytes([0xFF, 0xFB, 0x90, 0x64])))
+        self.assertFalse(has_mp3_signature(b"<!DOCTYPE html>"))
+        self.assertFalse(has_mp3_signature(b""))
 
 
 class LicenseAssessmentTests(unittest.TestCase):
