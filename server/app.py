@@ -265,7 +265,7 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
                                 needed = 3 - len(prefix)
                                 prefix.extend(chunk[:needed])
                                 chunk = chunk[needed:]
-                                if len(prefix) >= 2 and not has_mp3_signature(bytes(prefix)):
+                                if len(prefix) >= 3 and not has_mp3_signature(bytes(prefix)):
                                     raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
                             if chunk:
                                 received += len(chunk)
