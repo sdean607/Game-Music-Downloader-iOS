@@ -294,8 +294,8 @@ $("#play-button").addEventListener("click", async () => {
   if (audio.paused) { try { await audio.play(); } catch { toast("Não foi possível iniciar a reprodução."); } }
   else audio.pause();
 });
-audio.addEventListener("play", () => $("#play-button").textContent = "Ⅱ");
-audio.addEventListener("pause", () => $("#play-button").textContent = "▶");
+audio.addEventListener("play", () => { $("#play-button").textContent = "Ⅱ"; if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "playing"; });
+audio.addEventListener("pause", () => { $("#play-button").textContent = "▶"; if ("mediaSession" in navigator) navigator.mediaSession.playbackState = "paused"; });
 audio.addEventListener("timeupdate", () => {
   $("#current-time").textContent = formatTime(audio.currentTime);
   $("#duration").textContent = formatTime(audio.duration);
