@@ -277,11 +277,15 @@ async def write_mp3_payload(content: Any, temporary: Path) -> int:
                     needed = 3 - len(prefix)
                     prefix.extend(chunk[:needed])
                     chunk = chunk[needed:]
-                    if len(prefix) >= 3 and not has_mp3_signature(bytes(prefix)):
-                        raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                    if len(prefix) >= 3:
+                        if not has_mp3_signature(bytes(prefix)):
+                            raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                        output.write(prefix)
+                        received += len(prefix)
+                        prefix.clear()
                 if chunk:
                     received += len(chunk)
-                    if received + len(prefix) > MAX_DOWNLOAD_BYTES:
+                    if received > MAX_DOWNLOAD_BYTES:
                         raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
                     output.write(chunk)
             if prefix:
@@ -289,8 +293,8 @@ async def write_mp3_payload(content: Any, temporary: Path) -> int:
                     raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
                 output.write(prefix)
                 received += len(prefix)
-        if received <= 0:
-            raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
+            if received <= 0:
+                raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
         return received
     except BaseException:
         temporary.unlink(missing_ok=True)
