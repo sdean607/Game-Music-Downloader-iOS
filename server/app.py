@@ -214,6 +214,13 @@ def openverse_mp3(item: dict[str, Any]) -> bool:
     return filetype == "mp3" or urlsplit(url).path.lower().endswith(".mp3")
 
 
+def has_mp3_signature(header: bytes) -> bool:
+    """Rejects HTML, images and other payloads masquerading as MP3 files."""
+    if header.startswith(b"ID3"):
+        return True
+    return len(header) >= 2 and header[0] == 0xFF and (header[1] & 0xE0) == 0xE0
+
+
 async def validate_public_media_url(raw_url: str) -> str:
     try:
         parsed = urlsplit(raw_url)
@@ -248,12 +255,28 @@ async def stream_openverse_media(raw_url: str, temporary: Path) -> int:
                     accepted = {"audio/mpeg", "audio/mp3", "audio/x-mpeg", "audio/x-mp3", "application/octet-stream", "binary/octet-stream"}
                     if mime and mime not in accepted:
                         raise HTTPException(status_code=415, detail="O provedor não entregou um arquivo MP3 reconhecido.")
+                    declared_length = response.headers.get("content-length")
+                    if declared_length and declared_length.isdigit() and int(declared_length) > MAX_DOWNLOAD_BYTES:
+                        raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
+                    prefix = bytearray()
                     with temporary.open("wb") as output:
                         async for chunk in response.aiter_bytes(64 * 1024):
-                            received += len(chunk)
-                            if received > MAX_DOWNLOAD_BYTES:
-                                raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
-                            output.write(chunk)
+                            if len(prefix) < 3:
+                                needed = 3 - len(prefix)
+                                prefix.extend(chunk[:needed])
+                                chunk = chunk[needed:]
+                                if len(prefix) >= 2 and not has_mp3_signature(bytes(prefix)):
+                                    raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                            if chunk:
+                                received += len(chunk)
+                                if received + len(prefix) > MAX_DOWNLOAD_BYTES:
+                                    raise HTTPException(status_code=413, detail="O arquivo ultrapassa o limite de 150 MB.")
+                                output.write(chunk)
+                        if prefix:
+                            if not has_mp3_signature(bytes(prefix)):
+                                raise HTTPException(status_code=415, detail="O conteúdo recebido não possui assinatura de áudio MP3.")
+                            output.write(prefix)
+                            received += len(prefix)
                     if received <= 0:
                         raise HTTPException(status_code=422, detail="O arquivo baixado está vazio.")
                     return received
@@ -500,12 +523,17 @@ async def download_openverse_track(body: OpenverseDownloadRequest, _: str = Depe
     stored_name = f"{track_id}_{safe_title}.mp3"
     destination = MUSIC_DIR / stored_name
     temporary = MUSIC_DIR / f"{stored_name}.part"
-    received = await stream_openverse_media(media_url, temporary)
-    temporary.replace(destination)
-    track = {"id": track_id, "title": clean_string(item.get("title")) or safe_title, "artist": clean_string(item.get("creator")) or "Desconhecido", "game": clean_string(item.get("provider")) or "Openverse", "source": "openverse", "sourceIdentifier": body.identifier, "filename": stored_name, "license": assessment["licenseURL"], "attributionURL": landing_url, "creatorURL": clean_string(item.get("creator_url")), "provider": clean_string(item.get("provider")), "size": received, "downloadedAt": datetime.now(timezone.utc).isoformat()}
-    tracks = await load_library()
-    tracks.insert(0, track)
-    await save_library(tracks)
+    try:
+        received = await stream_openverse_media(media_url, temporary)
+        temporary.replace(destination)
+        track = {"id": track_id, "title": clean_string(item.get("title")) or safe_title, "artist": clean_string(item.get("creator")) or "Desconhecido", "game": clean_string(item.get("provider")) or "Openverse", "source": "openverse", "sourceIdentifier": body.identifier, "filename": stored_name, "license": assessment["licenseURL"], "attributionURL": landing_url, "creatorURL": clean_string(item.get("creator_url")), "provider": clean_string(item.get("provider")), "size": received, "downloadedAt": datetime.now(timezone.utc).isoformat()}
+        tracks = await load_library()
+        tracks.insert(0, track)
+        await save_library(tracks)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        destination.unlink(missing_ok=True)
+        raise
     return {"track": track, "message": "Música do Openverse salva na biblioteca do servidor."}
 
 
