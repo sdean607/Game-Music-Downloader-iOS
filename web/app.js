@@ -229,7 +229,7 @@ function renderPlaylists() {
     const list = state.playlists.find(item => item.id === button.dataset.id);
     const tracks = list.ids.map(id => state.tracks.find(track => track.id === id)).filter(Boolean);
     const target = $(`#playlist-${list.id}`);
-    target.innerHTML = tracks.length ? tracks.map((track, index) => trackCard(track, index, false)).join("") : '<p class="detail-muted">Adicione músicas pelo botão de playlist na biblioteca em uma próxima etapa.</p>';
+    target.innerHTML = tracks.length ? tracks.map((track, index) => trackCard(track, index, false)).join("") : '<p class="detail-muted">Adicione músicas usando o botão + na biblioteca.</p>';
     bindTrackActions(target, tracks);
   }));
   el.querySelectorAll(".remove-playlist").forEach(button => button.addEventListener("click", () => {
@@ -269,12 +269,19 @@ async function playTrack(track, queue = state.tracks) {
     $("#player-artist").textContent = track.artist;
     $("#player-bar").hidden = false;
     if ("mediaSession" in navigator && "MediaMetadata" in window) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.artist, album: track.game, artwork: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }] });
-      navigator.mediaSession.setActionHandler("play", () => audio.play());
-      navigator.mediaSession.setActionHandler("pause", () => audio.pause());
-      navigator.mediaSession.setActionHandler("previoustrack", previousTrack);
-      navigator.mediaSession.setActionHandler("nexttrack", nextTrack);
-      navigator.mediaSession.setActionHandler("seekto", details => { if (Number.isFinite(details.seekTime)) audio.currentTime = details.seekTime; });
+      try {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.artist, album: track.game, artwork: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }] });
+        const actions = {
+          play: () => audio.play(),
+          pause: () => audio.pause(),
+          previoustrack: previousTrack,
+          nexttrack: nextTrack,
+          seekto: details => { if (Number.isFinite(details.seekTime)) audio.currentTime = details.seekTime; }
+        };
+        for (const [action, handler] of Object.entries(actions)) {
+          try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* Ação não suportada neste navegador. */ }
+        }
+      } catch { /* Media Session é opcional; não deve impedir a reprodução. */ }
     }
     await audio.play();
     state.history = [track.id, ...state.history.filter(id => id !== track.id)].slice(0, 100);
